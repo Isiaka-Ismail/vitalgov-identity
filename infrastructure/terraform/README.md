@@ -1,0 +1,121 @@
+# VitalGov infrastructure - `infrastructure/terraform`
+
+Wave-1 infrastructure for the VitalGov capstone, all in `af-south-1` (brief
+requirement, residency ADR-012). Design rationale lives in `docs/cloud/`.
+
+## Layout
+
+```
+terraform/               root config (wiring, variables, outputs)
+  state/                 bootstrap: state bucket + lock table
+  logs/                  CloudTrail + ALB log bucket
+  iam/                   GitHub OIDC deploy role (scoped to vitalgov-*)
+  Networking/            VPC, 4-tier subnets, single NAT, flow logs
+  SecurityGroups/        §7.2 matrix from network-traffic-flows.md
+  VpcEndpoints/          S3 gateway + 4 interface endpoints (KMS, SM, SSM×2)
+  Alb/                   internet-facing ALB + target group
+  Ecr/                   vitalgov-api repository
+  Ecs/                   shared cluster; API + Keycloak Fargate services
+  Database/              RDS PostgreSQL 15 (data subnets, no NAT route)
+  SecretsManager/        db-host/name/user/password, jwt, keycloak-admin
+  S3/                    realm-backups bucket (Keycloak exports)
+  Observability/         CloudTrail (CMK), 5 alarms, SNS, budget
+  Ops/                   Tailscale connector + Wazuh log-forwarder hosts
+  Pki/                   CA CMK; placeholder host gated by create_ca_host
+  Acm/                   dormant until a domain exists
+```
+
+## Deployment gate
+
+**No `terraform apply` before the four-discipline review signs off (D1).**
+Writing and validating Terraform is allowed; provisioning is not.
+
+## Bootstrap (first apply, after review sign-off)
+
+Secrets are supplied as `TF_VAR_*` environment variables; never CLI args:
+
+```bash
+export TF_VAR_db_username="vitalgov"
+export TF_VAR_db_password="$(openssl rand -base64 24)"
+export TF_VAR_jwt_secret="$(openssl rand -base64 48)"
+export TF_VAR_keycloak_admin_password="$(openssl rand -base64 24)"
+export TF_VAR_container_image="<account>.dkr.ecr.af-south-1.amazonaws.com/vitalgov-api:latest"
+export TF_VAR_github_org_id="<numeric org id>"
+export TF_VAR_github_repo_id="<numeric repo id>"
+
+cd infrastructure/terraform
+
+# 1. Provision the state backend only
+terraform init -backend=false
+terraform apply -target=module.state -auto-approve
+
+# 2. Migrate to the remote backend
+terraform init \
+  -backend-config="bucket=vitalgov-production-tfstate" \
+  -backend-config="key=vitalgov/production/terraform.tfstate" \
+  -backend-config="region=af-south-1"
+
+# 3. Apply in waves; each wave must converge before the next
+terraform apply -target=module.networking
+terraform apply -target=module.security_groups
+terraform apply -target=module.vpc_endpoints
+terraform apply -target=module.logs
+terraform apply -target=module.alb
+terraform apply -target=module.ecr
+terraform apply -target=module.secrets_manager
+terraform apply -target=module.rds
+terraform apply -target=module.ecs
+terraform apply -target=module.observability
+terraform apply -target=module.ops
+terraform apply -target=module.pki
+terraform apply -target=module.iam
+
+# 4. Full stack
+terraform apply
+```
+
+Profile: `admin` (Team 2 AWS account). Region fixed at `af-south-1`.
+
+## Cost
+
+af-south-1 on-demand, always-on shape (~730 h/month, no Reserved/Spot):
+
+| Service | Shape | Est. USD/mo |
+|---|---|---|
+| NAT gateway | 1 × + data | ~$35 |
+| ALB | 1 × + LCU | ~$22 |
+| ECS Fargate | 2 services × 0.25 vCPU / 512 MB | ~$70 |
+| RDS PostgreSQL | db.t3.micro, 20 GB gp3, Single-AZ | ~$16 |
+| VPC endpoints | 4 interface × 1 AZ + S3 gateway (free) | ~$30 |
+| EC2 ops hosts | t3.nano + t3.micro (CA host off until I-007) | ~$11 |
+| CloudTrail, S3, CW logs, SNS, budget | small volumes | ~$7 |
+| **Total** | | **~$190** |
+
+Budget alarm: $200 ceiling, alerts at 80% ($160) and 100%. Notification
+emails are not committed; set `TF_VAR_budget_alert_emails='["<address>"]'`
+at apply time.
+
+### What was cut to get here (and what each cut saved)
+
+| Cut | Saving | Where |
+|---|---|---|
+| Interface endpoints 11 → 4, both AZs → 1 AZ | ~$130 | Endpoints cost ~$7.31/endpoint/**AZ**; ECR/CW/ECS/STS now ride the NAT. `endpoint_az_count = 2` restores dual-AZ |
+| Keycloak task 0.5 vCPU/1 GB → 0.25/512 MB | ~$30 | Floor for 3 test realms; raise if review loads more |
+| RDS enhanced monitoring 60 s → off | ~$20 | Per-vCPU-hour charge; basic CloudWatch + alarms remain |
+| CA placeholder host off until I-007 | ~$8 | `create_ca_host = false`; CMK still created |
+| Connector t3.micro → t3.nano | ~$5 | Tailscaled is light; forwarder stays micro (Wazuh agent) |
+
+### Levers the review can still pull
+
+| Lever | Extra saving | Trade-off |
+|---|---|---|
+| Keycloak on t3.micro EC2 instead of Fargate | ~$27 | Contradicts ADR-008 Fargate rec; loses circuit-breaker/rollback |
+| Secrets Manager endpoint → NAT | ~$7 | Credentials traverse NAT (still TLS) |
+| S3 gateway covers ECR layers already | - | Image pulls via NAT add minor data cost |
+
+Realistic floor with the brief's ALB + mTLS + private tiers intact: ~$175.
+Below that requires dropping brief-mandated components.
+
+## Teardown
+
+See [TEARDOWN.md](../../TEARDOWN.md).

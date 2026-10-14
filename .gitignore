@@ -9,3 +9,23 @@ baselines/*.json
 __pycache__/
 *.pyc
 .DS_Store
+
+# Personal tracking files - cloud team workspace, do not commit (union with local rules, issue I-015)
+plan.md
+issues.md
+progress.md
+summary.md
+review-invite.md
+project.md
+
+# Terraform working dirs (provider cache, module cache)
+**/.terraform/
+
+# Crash logs & override files
+crash.log
+*.tfstate
+*.tfstate.*
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json

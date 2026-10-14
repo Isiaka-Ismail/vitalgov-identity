@@ -1,6 +1,6 @@
 # VitalGov IdentityForge
 
-Expadox Lab Cohort 3 — Capstone Project (Team 2)
+Expadox Lab Cohort 3 - Capstone Project (Team 2)
 
 A zero-trust identity platform for Nigeria's National Health Act (NHA) compliance. Covers multi-realm Keycloak federation, mutual TLS enforcement, data sovereignty enforcement to `af-south-1`, and real-time anomaly detection aligned to NHA Sections 26-29.
 
@@ -98,7 +98,7 @@ These are intentional gaps for mentees to complete:
 cd path/to/identityforge-vitalgov/vitalgov-clean
 git init
 git add .
-git commit -m "feat: VitalGov IdentityForge capstone — Team 2"
+git commit -m "feat: VitalGov IdentityForge capstone - Team 2"
 git remote add origin https://github.com/expadox/identityforge-vitalgov.git
 git branch -M main
 git push -u origin main
