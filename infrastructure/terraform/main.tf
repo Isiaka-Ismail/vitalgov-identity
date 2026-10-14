@@ -85,9 +85,11 @@ module "alb" {
 module "secrets_manager" {
   source = "./SecretsManager"
 
-  project_name            = var.project_name
-  environment             = var.environment
-  db_host                 = module.rds.db_endpoint
+  project_name = var.project_name
+  environment  = var.environment
+  # db_hostname (no port) not db_endpoint (host:5432) - drivers resolve DB_HOST
+  # as a bare hostname.
+  db_host                 = module.rds.db_hostname
   db_name                 = var.db_name
   db_user                 = var.db_username
   db_password             = var.db_password
@@ -145,10 +147,14 @@ module "ecs" {
       health_check_cmd  = "exec 3<>/dev/tcp/localhost/8080 && printf 'GET /realms/master HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"
       security_group_id = module.security_groups.keycloak_security_group_id
       environment = {
-        AWS_REGION                  = var.aws_region
-        KC_DB                       = "postgres"
-        KC_DB_URL_HOST              = module.rds.db_hostname
-        KC_DB_URL_DATABASE          = "keycloak"
+        AWS_REGION     = var.aws_region
+        KC_DB          = "postgres"
+        KC_DB_URL_HOST = module.rds.db_hostname
+        # Connect to the database RDS actually creates (var.db_name); a dedicated
+        # schema keeps Keycloak's tables out of the API's. Pointing at a literal
+        # "keycloak" database crashes Keycloak - RDS never creates it.
+        KC_DB_URL_DATABASE          = var.db_name
+        KC_DB_URL_SCHEMA            = "keycloak"
         KC_DB_USERNAME              = var.db_username
         KC_BOOTSTRAP_ADMIN_USERNAME = var.keycloak_admin_username
         KC_HOSTNAME_STRICT          = "false"
@@ -211,6 +217,7 @@ module "observability" {
   budget_limit_usd    = var.budget_limit_usd
   budget_alert_emails = var.budget_alert_emails
   log_bucket_name     = module.logs.bucket_name
+  deploy_role_arn     = module.iam.github_actions_role_arn
   common_tags         = local.common_tags
 
   # Trail validates the bucket policy at creation; wait for the whole module.
@@ -240,6 +247,7 @@ module "pki" {
   pki_subnet_ids       = module.networking.pki_subnet_ids
   ca_security_group_id = module.security_groups.ca_security_group_id
   create_ca_host       = var.create_ca_host
+  deploy_role_arn      = module.iam.github_actions_role_arn
   common_tags          = local.common_tags
 }
 

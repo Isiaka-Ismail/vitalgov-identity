@@ -33,42 +33,51 @@ resource "aws_kms_key" "ca" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Sid       = "RootAdmin"
-        Effect    = "Allow"
-        Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" }
-        Action    = "kms:*"
-        Resource  = "*"
-      },
-      {
-        Sid       = "DeployRoleAdmin"
-        Effect    = "Allow"
-        Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-${var.environment}-github-actions" }
-        Action = [
-          "kms:DescribeKey",
-          "kms:GetKeyPolicy",
-          "kms:PutKeyPolicy",
-          "kms:TagResource",
-          "kms:UntagResource",
-          "kms:EnableKeyRotation"
-        ]
-        Resource = "*"
-      },
-      {
-        # CA host may use the key but not administer it.
-        Sid       = "CAHostUse"
-        Effect    = "Allow"
-        Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-${var.environment}-ca-host" }
-        Action = [
-          "kms:Encrypt",
-          "kms:Decrypt",
-          "kms:GenerateDataKey*",
-          "kms:DescribeKey"
-        ]
-        Resource = "*"
-      }
-    ]
+    Statement = concat(
+      [
+        {
+          Sid       = "RootAdmin"
+          Effect    = "Allow"
+          Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" }
+          Action    = "kms:*"
+          Resource  = "*"
+        },
+        {
+          # Passed as an input (not string-interpolated) so Terraform creates a
+          # dependency edge on module.iam; KMS rejects policies naming a role
+          # that does not exist yet.
+          Sid       = "DeployRoleAdmin"
+          Effect    = "Allow"
+          Principal = { AWS = var.deploy_role_arn }
+          Action = [
+            "kms:DescribeKey",
+            "kms:GetKeyPolicy",
+            "kms:PutKeyPolicy",
+            "kms:TagResource",
+            "kms:UntagResource",
+            "kms:EnableKeyRotation"
+          ]
+          Resource = "*"
+        }
+      ],
+      # CA host may use the key but not administer it. Emitted only when the
+      # host (and its IAM role) actually exists; KMS rejects an unresolvable
+      # principal, and create_ca_host defaults to false.
+      var.create_ca_host ? [
+        {
+          Sid       = "CAHostUse"
+          Effect    = "Allow"
+          Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-${var.environment}-ca-host" }
+          Action = [
+            "kms:Encrypt",
+            "kms:Decrypt",
+            "kms:GenerateDataKey*",
+            "kms:DescribeKey"
+          ]
+          Resource = "*"
+        }
+      ] : []
+    )
   })
 
   tags = merge(

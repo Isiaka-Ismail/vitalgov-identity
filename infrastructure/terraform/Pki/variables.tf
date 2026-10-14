@@ -31,6 +31,11 @@ variable "create_ca_host" {
   default     = false
 }
 
+variable "deploy_role_arn" {
+  description = "ARN of the GitHub Actions deploy role, passed (not interpolated) so the KMS key policy has a real dependency edge on module.iam."
+  type        = string
+}
+
 variable "instance_type" {
   description = "EC2 instance type for the CA host."
   type        = string

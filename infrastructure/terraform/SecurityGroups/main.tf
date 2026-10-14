@@ -416,6 +416,19 @@ resource "aws_security_group_rule" "api_dns_tcp" {
   cidr_blocks       = [var.vpc_cidr]
 }
 
+# Container image pulls from ECR traverse the NAT gateway (awsvpc/Fargate pulls
+# egress over the task ENI). Without this the API task fails CannotPullContainerError
+# and the service circuit-breaker rolls back on the first deploy.
+resource "aws_security_group_rule" "api_egress_https_registry" {
+  description       = "Image and asset pulls via NAT (ECR api/dkr + layer S3) - narrowed if ECR endpoints are added"
+  type              = "egress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  security_group_id = aws_security_group.api.id
+  cidr_blocks       = ["0.0.0.0/0"]
+}
+
 # ---------------------------------------------------------------------------
 # RDS tier (F6, ADR-009)
 # ---------------------------------------------------------------------------

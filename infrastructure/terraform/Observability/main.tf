@@ -195,9 +195,12 @@ resource "aws_kms_key" "trail" {
         Resource = "*"
       },
       {
+        # Passed as an input (not string-interpolated) so Terraform creates a
+        # dependency edge on module.iam; KMS rejects a policy naming a role
+        # that does not exist yet at key-creation time.
         Sid       = "DeployRoleAdmin"
         Effect    = "Allow"
-        Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-${var.environment}-github-actions" }
+        Principal = { AWS = var.deploy_role_arn }
         Action = [
           "kms:DescribeKey",
           "kms:GetKeyPolicy",

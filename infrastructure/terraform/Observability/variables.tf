@@ -62,3 +62,8 @@ variable "log_bucket_name" {
   description = "S3 bucket receiving CloudTrail logs (managed by the logs module)."
   type        = string
 }
+
+variable "deploy_role_arn" {
+  description = "ARN of the GitHub Actions deploy role, passed (not interpolated) so the trail KMS key policy has a real dependency edge on module.iam."
+  type        = string
+}

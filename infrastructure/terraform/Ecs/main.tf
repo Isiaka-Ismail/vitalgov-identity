@@ -60,10 +60,13 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution" {
 
 locals {
   all_secret_arns = distinct(flatten([for svc in var.services : values(svc.secrets)]))
+  # Count guard must be plan-time computable. Secret ARN *values* are unknown
+  # until apply, but the secret *keys* are literal, so count off those.
+  secret_count = length(flatten([for svc in var.services : keys(svc.secrets)]))
 }
 
 resource "aws_iam_role_policy" "ecs_task_execution_secrets" {
-  count = length(local.all_secret_arns) > 0 ? 1 : 0
+  count = local.secret_count > 0 ? 1 : 0
 
   name = "${var.project_name}-${var.environment}-secrets-access"
   role = aws_iam_role.ecs_task_execution.id
