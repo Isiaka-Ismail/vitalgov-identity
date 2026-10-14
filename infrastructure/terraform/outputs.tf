@@ -64,7 +64,7 @@ output "github_actions_role_arn" {
 }
 
 output "ops_instance_ids" {
-  description = "Ops-tier EC2 instances (Tailscale connector, Wazuh log-forwarder)."
+  description = "Ops-tier EC2 instance (Tailscale connector + Wazuh log-forwarder)."
   value       = module.ops.instance_ids
 }
 

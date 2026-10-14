@@ -93,7 +93,7 @@ resource "aws_security_group" "ca" {
 
 resource "aws_security_group" "ops" {
   name        = "${var.project_name}-${var.environment}-ops-sg"
-  description = "Ops tier (Tailscale connector, Wazuh log-forwarder): no inbound rules; initiates everything."
+  description = "Ops tier (Tailscale connector + Wazuh log-forwarder on one host): no inbound rules; initiates everything."
   vpc_id      = var.vpc_id
 
   tags = merge(local.common_tags, {

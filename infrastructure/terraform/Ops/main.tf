@@ -15,28 +15,17 @@ locals {
   )
 
   hosts = {
-    "connector" = {
-      role          = "Tailscale connector (lab federation + Wazuh transport)"
-      instance_type = "t3.nano"
+    "ops" = {
+      role          = "Tailscale connector + Wazuh log-forwarder (ADR-013 / F15)"
+      instance_type = "t3.small" # Wazuh agent ~1 GiB + Tailscale + log-buffer headroom
       user_data     = <<-EOT
         #!/bin/bash
         set -euo pipefail
         systemctl enable --now amazon-ssm-agent
-        # Tailscale install/up is performed by the ops pipeline via SSM
-        # once a fresh tagged auth key is issued (I-023).
-        echo "${var.project_name}-connector bootstrapped $(date -u +%FT%TZ)" > /var/log/${var.project_name}-bootstrap.log
-      EOT
-    }
-    "log-forwarder" = {
-      role          = "Wazuh log-forwarder (F15: 1514/1515 over the tailnet)"
-      instance_type = "t3.micro" # Wazuh agent needs the full 1 GiB
-      user_data     = <<-EOT
-        #!/bin/bash
-        set -euo pipefail
-        systemctl enable --now amazon-ssm-agent
-        # Wazuh agent install is performed by the ops pipeline via SSM once
-        # the manager address is known and the tailnet route exists.
-        echo "${var.project_name}-log-forwarder bootstrapped $(date -u +%FT%TZ)" > /var/log/${var.project_name}-bootstrap.log
+        # Tailscale and the Wazuh agent are installed by the ops pipeline via
+        # SSM once a fresh tagged auth key is issued (I-023) and the manager
+        # address + tailnet route are known.
+        echo "${var.project_name}-ops bootstrapped $(date -u +%FT%TZ)" > /var/log/${var.project_name}-bootstrap.log
       EOT
     }
   }
