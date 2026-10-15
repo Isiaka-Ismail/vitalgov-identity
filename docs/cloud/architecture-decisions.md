@@ -8,7 +8,7 @@ The log will be updated when the team approves the design or makes a material ch
 
 ---
 
-## ADR-001: AWS Region
+## ADR-001: AWS Region (drafted 12 Oct 2026)
 
 **Decision:** Use Africa (Cape Town), `af-south-1`, for in-scope AWS resources.
 
@@ -24,7 +24,7 @@ The log will be updated when the team approves the design or makes a material ch
 
 ---
 
-## ADR-002: Two Availability Zones
+## ADR-002: Two Availability Zones (drafted 12 Oct 2026)
 
 **Decision:** Design the VPC to span two Availability Zones.
 
@@ -36,7 +36,7 @@ The log will be updated when the team approves the design or makes a material ch
 
 ---
 
-## ADR-003: VPC CIDR
+## ADR-003: VPC CIDR (drafted 12 Oct 2026)
 
 **Decision:** Propose `10.20.0.0/16` for the VPC.
 
@@ -50,7 +50,7 @@ The log will be updated when the team approves the design or makes a material ch
 
 ---
 
-## ADR-004: Public ALB and private EC2 instances
+## ADR-004: Public ALB and private EC2 instances (drafted 12 Oct 2026)
 
 **Decision:** Use an internet-facing ALB for public HTTPS entry and run application instances in private subnets.
 
@@ -64,7 +64,7 @@ The log will be updated when the team approves the design or makes a material ch
 
 ---
 
-## ADR-005: One shared NAT gateway
+## ADR-005: One shared NAT gateway (drafted 12 Oct 2026)
 
 **Decision:** Use one NAT gateway in a public subnet in AZ 1.
 
@@ -78,7 +78,7 @@ The log will be updated when the team approves the design or makes a material ch
 
 ---
 
-## ADR-006: VPC endpoints
+## ADR-006: VPC endpoints (drafted 12 Oct 2026)
 
 **Decision:** Use VPC endpoints for supported AWS services where required.
 
@@ -96,7 +96,7 @@ The log will be updated when the team approves the design or makes a material ch
 
 ---
 
-## ADR-007: Dedicated PKI subnet tier
+## ADR-007: Dedicated PKI subnet tier (drafted 12 Oct 2026)
 
 **Decision:** Reserve subnet CIDRs for PKI/CA services, subject to confirmation of the final service placement.
 
