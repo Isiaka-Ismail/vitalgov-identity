@@ -251,6 +251,45 @@ required before connector configuration (I-023); production posture returns to F
 
 ---
 
+## ADR-014: GitHub Actions OIDC deploy role (decided 15 Oct 2026)
+
+**Decision:** CI authenticates to AWS through the existing OIDC provider
+(`token.actions.githubusercontent.com`) and one deploy role,
+`vitalgov-production-github-actions`, held to two limits: only protected branches of this
+repository may assume it, and the policy keeps no account-wide mutating grant.
+
+| Control | Setting |
+|---|---|
+| Who may assume | `ref:refs/heads/cloud` and `ref:refs/heads/main` only, in both token formats (`org/repo` and `org@id/repo@id`) |
+| Audience | `sts.amazonaws.com` only |
+| EC2 | describe and tag actions; no `RunInstances`, no VPC, subnet, route or security-group mutation |
+| IAM | `iam:PassRole` on the two ECS roles only; no `CreateRole`, `PutRolePolicy`, `AttachRolePolicy` |
+| KMS | no account-wide `PutKeyPolicy`, `GetKeyPolicy`, `ScheduleKeyDeletion`; alias actions scoped to `alias/vitalgov-*` |
+| CloudTrail, budgets, SNS | read-only, with `sns:Publish` retained for budget alerts |
+| ECS | 8 deployment actions rather than `ecs:*` |
+| Destructive data actions | none: `DeleteBucket`, `DeleteDBInstance`, `DeleteLogGroup`, `DeleteLoadBalancer`, `DeleteRepository` are all absent |
+
+**Reason:** the role is assumed by automation, so a leaked token is the whole blast radius.
+The first version trusted any ref in the repository and granted `Resource = "*"` across
+`ec2:*`, `kms:*`, `cloudtrail:*` and `budgets:*` (issue I-030). Branch pinning keeps a
+compromised workflow, a forked pull request or a stray feature branch out of the production
+account entirely, and the trimmed policy limits what a valid token can do once inside.
+
+**Implementation notes:** two actions stay on `Resource = "*"` because AWS will not
+resource-scope them: `ecr:GetAuthorizationToken` and `ecs:DeregisterTaskDefinition`. The
+provider thumbprint is the SHA-1 of ISRG Root X1, the anchor of the chain the GitHub OIDC
+endpoint currently serves; the earlier DigiCert hashes no longer matched that chain. Full
+`terraform apply` continues from the admin profile, because the role deliberately cannot
+create EC2, VPC, ALB, RDS, CloudTrail or SNS resources: CI is a deploy-and-verify path, not
+an infrastructure-build path.
+
+**Trade-off:** CI cannot apply the whole stack. If that becomes wanted, split the role into
+a read/verify role and a scoped infrastructure changer instead of widening this one.
+
+**Status:** Applied and verified 15 Oct 2026 (issue I-030; OIDC smoke run 38793657035).
+
+---
+
 ## Decisions register before provisioning
 
 Terraform is written and `terraform plan` is clean (166 to add, 0 to destroy). Owners
@@ -264,6 +303,7 @@ deferred there with an owner and date. That sign-off is the gate to `terraform a
 | Compute model | EC2 vs ECS | DevOps + Cloud | ECS for apps, EC2 for CA (ADR-008) | Before apply |
 | Database | RDS vs self-managed | DevOps + Cloud | RDS PostgreSQL 15, Single-AZ (ADR-009) | Before apply |
 | Admin access | SSM vs bastion vs SSH | Cloud + Security | Session Manager (ADR-011) | Before apply |
+| CI deploy-role trust | A any ref / B any branch / C protected branches | Cloud | **Protected branches only, least privilege (ADR-014)** | Resolved in code; confirm at review |
 | NAT strategy | 1 vs 2 gateways | Cloud + Security | Single NAT, risk accepted (ADR-010) | At review |
 | CA software + staple age/fallback | Smallstep vs EJBCA | Security; **Ismail implements** (Cloud PKI) | Open, issue I-007 | Before gateway config |
 | Residency trust model | header-only vs layered | Security + DevOps | Layered (ADR-012 / I-018) | Before API/gateway work |

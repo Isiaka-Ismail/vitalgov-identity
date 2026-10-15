@@ -3,10 +3,8 @@ data "aws_caller_identity" "current" {}
 resource "aws_iam_openid_connect_provider" "github" {
   url            = "https://token.actions.githubusercontent.com"
   client_id_list = ["sts.amazonaws.com"]
-  thumbprint_list = [
-    "6938fd4d98bab03faadb97b34396831e3780aea1",
-    "1c58a3a8518e8759bf075b76b750d4f2df264fcd"
-  ]
+  # SHA-1 of ISRG Root X1, the anchor of the chain currently served by token.actions.githubusercontent.com (Let's Encrypt). The old DigiCert hashes no longer match.
+  thumbprint_list = ["cabd2a79a1076a31f21d253635cb039d4329a5e8"]
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-github-oidc"
@@ -38,11 +36,13 @@ resource "aws_iam_role" "github_actions" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
 
-          # Branch-pinned: only pushes to cloud may assume the production role (no fork/feature-branch access).
+          # Protected-branch pinned: only cloud and main may assume the role, so forks, tags and feature branches cannot.
           StringLike = {
             "token.actions.githubusercontent.com:sub" = [
               "repo:${var.github_org}/${var.github_repo}:ref:refs/heads/cloud",
-              "repo:${var.github_org}@${var.github_org_id}/${var.github_repo}@${var.github_repo_id}:ref:refs/heads/cloud"
+              "repo:${var.github_org}/${var.github_repo}:ref:refs/heads/main",
+              "repo:${var.github_org}@${var.github_org_id}/${var.github_repo}@${var.github_repo_id}:ref:refs/heads/cloud",
+              "repo:${var.github_org}@${var.github_org_id}/${var.github_repo}@${var.github_repo_id}:ref:refs/heads/main"
             ]
           }
         }
@@ -144,7 +144,6 @@ resource "aws_iam_role_policy" "github_actions" {
           "ecr:BatchCheckLayerAvailability",
           "ecr:DescribeRepositories",
           "ecr:CreateRepository",
-          "ecr:DeleteRepository",
           "ecr:PutImageScanningConfiguration",
           "ecr:PutImageTagMutability",
           "ecr:PutLifecyclePolicy",
@@ -164,7 +163,6 @@ resource "aws_iam_role_policy" "github_actions" {
           "rds:DescribeDBInstances",
           "rds:CreateDBInstance",
           "rds:ModifyDBInstance",
-          "rds:DeleteDBInstance",
           "rds:RebootDBInstance",
           "rds:CreateDBSnapshot",
           "rds:DeleteDBSnapshot",
@@ -204,7 +202,6 @@ resource "aws_iam_role_policy" "github_actions" {
         Effect = "Allow"
         Action = [
           "s3:CreateBucket",
-          "s3:DeleteBucket",
           "s3:ListBucket",
           "s3:GetBucketLocation",
           "s3:GetBucketPolicy",
@@ -235,7 +232,6 @@ resource "aws_iam_role_policy" "github_actions" {
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
-          "logs:DeleteLogGroup",
           "logs:DescribeLogGroups",
           "logs:DescribeLogStreams",
           "logs:PutRetentionPolicy",
@@ -295,7 +291,6 @@ resource "aws_iam_role_policy" "github_actions" {
         Effect = "Allow"
         Action = [
           "elasticloadbalancing:CreateLoadBalancer",
-          "elasticloadbalancing:DeleteLoadBalancer",
           "elasticloadbalancing:DescribeLoadBalancers",
           "elasticloadbalancing:DescribeLoadBalancerAttributes",
           "elasticloadbalancing:ModifyLoadBalancerAttributes",

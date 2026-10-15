@@ -39,7 +39,7 @@ The ALB will receive external HTTPS traffic and forward approved requests to hea
 
 VPC endpoints will provide private connectivity to supported AWS services where required. A shared NAT gateway will provide outbound internet access for private workloads that genuinely need it.
 
-### Architecture diagram (draft, pending team review)
+### Architecture diagram
 
 Solid lines are flows documented in [network-traffic-flows.md](network-traffic-flows.md) (F1–F14);
 dashed lines are pending designs (issue I-007, CA/OCSP details). Conditional components are
