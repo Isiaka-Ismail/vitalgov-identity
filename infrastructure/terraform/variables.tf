@@ -253,16 +253,16 @@ variable "github_repo_id" {
 }
 
 variable "tailscale_auth_key" {
-  description = "Tailscale auth key for the ops-tier connector. Supply as TF_VAR_tailscale_auth_key after rotation (I-023). Empty leaves hosts off the tailnet."
+  description = "Tailscale auth key for the ops-tier connector. Placeholder until rotation completes (I-023); Parameter Store rejects empty values."
   type        = string
-  default     = ""
+  default     = "pending-I-023"
   sensitive   = true
 }
 
 variable "wazuh_manager_ip" {
-  description = "Wazuh manager address (tailnet IP or hostname) the log-forwarder ships to. Empty skips agent registration."
+  description = "Wazuh manager address (tailnet IP or hostname) the log-forwarder ships to. Placeholder until the manager is reachable (I-024); Parameter Store rejects empty values."
   type        = string
-  default     = ""
+  default     = "unset"
 }
 
 variable "create_ca_host" {

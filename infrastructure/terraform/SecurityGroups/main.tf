@@ -283,8 +283,9 @@ resource "aws_security_group_rule" "keycloak_egress_ldaps_clinic" {
 }
 
 # F12: state SAML IdPs.
+# quay.io pulls share this permission; EC2 rejects a second identical 443 rule (InvalidPermission.Duplicate).
 resource "aws_security_group_rule" "keycloak_egress_saml" {
-  description       = "F12: state SAML IdPs via NAT"
+  description       = "F12: state SAML IdPs and quay.io image pulls via NAT"
   type              = "egress"
   from_port         = 443
   to_port           = 443
@@ -301,17 +302,6 @@ resource "aws_security_group_rule" "keycloak_egress_endpoints" {
   protocol                 = "tcp"
   security_group_id        = aws_security_group.keycloak.id
   source_security_group_id = aws_security_group.endpoints.id
-}
-
-# Container image pulls from quay.io (Keycloak) traverse the NAT gateway.
-resource "aws_security_group_rule" "keycloak_egress_https_registry" {
-  description       = "Image and asset pulls via NAT (quay.io) - narrowed once mirrored to ECR"
-  type              = "egress"
-  from_port         = 443
-  to_port           = 443
-  protocol          = "tcp"
-  security_group_id = aws_security_group.keycloak.id
-  cidr_blocks       = ["0.0.0.0/0"]
 }
 
 resource "aws_security_group_rule" "keycloak_dns_udp" {
@@ -484,16 +474,6 @@ resource "aws_security_group_rule" "ca_dns_tcp" {
 # Ops tier (F13–F15, ADR-013)
 
 # F13/F14: onboarding-pipeline federation pre-checks via NAT.
-resource "aws_security_group_rule" "ops_egress_https_registry" {
-  description       = "F13/F14: federation pre-checks via NAT - registry-scoped at deployment"
-  type              = "egress"
-  from_port         = 443
-  to_port           = 443
-  protocol          = "tcp"
-  security_group_id = aws_security_group.ops.id
-  cidr_blocks       = var.clinic_federation_cidrs
-}
-
 resource "aws_security_group_rule" "ops_egress_ldaps" {
   description       = "F13: LDAPS pre-checks via NAT - registry-scoped at deployment"
   type              = "egress"
@@ -545,8 +525,9 @@ resource "aws_security_group_rule" "ops_egress_endpoints" {
   source_security_group_id = aws_security_group.endpoints.id
 }
 
+# clinic_federation_cidrs defaults to 0.0.0.0/0, so a separate F13/F14 443 rule is the same permission.
 resource "aws_security_group_rule" "ops_egress_logs_nat" {
-  description       = "F15: CloudWatch Logs read via NAT (endpoint set reduced per ADR-006)"
+  description       = "F13/F14 federation pre-checks and CloudWatch Logs read via NAT (endpoint set reduced per ADR-006)"
   type              = "egress"
   from_port         = 443
   to_port           = 443
