@@ -1,10 +1,6 @@
-# PKI tier (ADR-007): KMS CMK protecting the issuing CA key material
-# (brief-mandated, created regardless of the CA software choice). The CA host
-# itself is gated by create_ca_host and ships as a placeholder until issue
-# I-007 (CA software decision, owner: Ismail) is settled. No public IP, no
-# SSH (SSM only, ADR-011), no NAT route in its route table (V10).
-# Inbound to the CA (F4: staple refresh + approved ops) is governed by
-# sg-ca rules in the SecurityGroups module.
+# PKI tier (ADR-007): KMS CMK for the issuing CA key, created regardless of
+# the CA software choice. The host is gated by create_ca_host until I-007
+# (owner: Ismail). No public IP, SSM only (ADR-011), no NAT route (V10).
 
 locals {
   common_tags = merge(

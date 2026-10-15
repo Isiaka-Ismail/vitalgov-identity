@@ -1,8 +1,6 @@
-# Ops tier (ADR-013): single ops host running the Tailscale connector and
-# the Wazuh agent in the private app subnets. No public IPs, no key pair;
-# SSM Session Manager only (ADR-011). The Tailscale auth key lives in an SSM
-# SecureString, never in user data (I-023 rotation required before first
-# `tailscale up`).
+# Ops tier (ADR-013): single ops host in the private app subnets running the
+# Tailscale connector and the Wazuh agent. No public IP, SSM only (ADR-011);
+# auth key in an SSM SecureString, never user data (I-023 pending).
 
 locals {
   common_tags = merge(

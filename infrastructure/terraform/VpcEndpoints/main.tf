@@ -1,16 +1,7 @@
-# Endpoint inventory per docs/cloud/aws-architecture.md §4.7, trimmed to the
-# endpoints that have a consumer the NAT gateway cannot serve:
-#   * KMS + SSM + SSMMessages, required by the CA tier (PKI subnets have no
-#     NAT route, V10) for key operations and Session Manager admin (ADR-011)
-#   * Secrets Manager, task credential injection must not traverse the NAT
-# S3 gateway endpoint (free) covers backups/log delivery/ECR layers on the
-# app, data AND pki route tables.
-# Everything else (ECR API, CloudWatch, ECS, STS) egresses via the shared NAT;
-# CloudTrail has no endpoint at all (ADR-006 / I-005 documented exception).
-#
-# Placement: single AZ (app subnet 0), same resilience trade-off already
-# accepted for the single NAT gateway (ADR-010). endpoint_az_count = 2
-# restores dual-AZ endpoints if the review requires it.
+# S3 gateway + KMS, Secrets Manager, SSM/SSMMessages interface endpoints in
+# AZ 1 (endpoint_az_count = 2 restores dual-AZ); every other AWS service
+# egresses via NAT. Inventory and the documented deviation:
+# docs/cloud/aws-architecture.md §4.7 (ADR-006, I-005, I-028).
 
 locals {
   common_tags = merge(

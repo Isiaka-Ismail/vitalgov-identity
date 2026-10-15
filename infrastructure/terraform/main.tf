@@ -291,10 +291,8 @@ module "acm" {
   common_tags  = local.common_tags
 }
 
-# Self-signed certificate imported to ACM so the ALB serves HTTPS :443 in
-# wave 1 without a domain (brief F1). Browsers warn; the test client skips
-# verification. Replaced automatically once domain_name is set to the team's
-# free DNS domain (manual CNAME validation, no Route 53).
+# Self-signed cert imported to ACM so the ALB serves HTTPS :443 before the
+# free DNS domain is validated (ADR-004). Replaced once domain_name is set.
 resource "tls_private_key" "self_signed" {
   count = local.use_self_signed ? 1 : 0
 
