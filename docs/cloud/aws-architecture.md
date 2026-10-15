@@ -67,7 +67,7 @@ flowchart TB
             gw["API gateway<br/>terminates mTLS + OCSP staple"]
             kc["Keycloak<br/>three realms, vitalgov-staff / clinics / admin"]
             api["VitalGov API<br/>JWT + residency middleware + RBAC"]
-            ops["Ops tier, EC2<br/>Tailscale connector + log-forwarder (Wazuh agent) - ADR-013"]
+            ops["Ops tier, single EC2<br/>Tailscale connector + Wazuh agent - ADR-013"]
         end
         subgraph DAT["Private data subnets"]
             db[("RDS PostgreSQL 15<br/>KMS-encrypted, ADR-009<br/>synthetic data in capstone")]
@@ -154,7 +154,7 @@ The final endpoint list will be based on the actual service dependencies. Endpoi
 
 #### Endpoint inventory (draft, pending team review)
 
-Endpoint placement uses the reserved endpoint ranges from [ip-addressing-plan.md](ip-addressing-plan.md) §3 where dedicated subnets are needed; interface endpoints may alternatively be placed in the existing private application subnets (open decision #5).
+Endpoint placement is the private application subnets, as implemented in Terraform; the reserved endpoint ranges from [ip-addressing-plan.md](ip-addressing-plan.md) §3 (`10.20.80.0/24`, `10.20.81.0/24`) are held unused should dedicated endpoint subnets be required later.
 
 | Service | Endpoint type | Placement | Consumed by | Purpose in VitalGov |
 |---|---|---|---|---|
@@ -169,7 +169,9 @@ Endpoint placement uses the reserved endpoint ranges from [ip-addressing-plan.md
 
 **CloudTrail endpoint exception (issue I-005):** AWS provides no VPC endpoint for CloudTrail. CloudTrail API calls from private subnets traverse the shared NAT gateway to the in-region AWS endpoint; log delivery goes to S3 via the gateway endpoint. Traffic remains within `af-south-1`. This is a formal deviation from the brief's "VPC endpoints for every AWS service" line and requires security-team approval before deployment (recorded in [architecture-decisions.md](architecture-decisions.md) ADR-006).
 
-This inventory is a draft for team review. Final endpoint types, policies, security-group rules and route-table associations are confirmed during implementation (open decision #5).
+**Log-file validation (brief non-negotiable):** CloudTrail is configured with **log file validation enabled**, so delivered log files in the S3 bucket carry digest files that allow tampering to be detected (an S3 `GetObject` against a validated digest reveals any post-delivery change). The digest files and trail logs are stored in the same af-south-1 S3 bucket and covered by the retention and encryption controls in the S3 module. Owner: Cloud Security (Ismail).
+
+This inventory is a draft for team review. Final endpoint types, policies, security-group rules and route-table associations are confirmed during implementation.
 
 ### NAT gateway
 
@@ -183,14 +185,13 @@ AWS service traffic with appropriate VPC endpoint support should use the relevan
 
 The identity evidence for this platform is first produced **outside AWS**, in the team's lab: local VMs running a Samba 4 Active Directory DC (the LDAP clinic), a standalone Keycloak (being aligned to the brief's three realms, I-022), and a Wazuh manager with agents. All lab machines are joined by a **Tailscale** overlay.
 
-Relationship to this design: the lab is the **evidence environment, not part of the af-south-1 target deployment** (ADR-013). AWS reaches it through exactly two EC2 hosts, both in the private application subnets, both administered via SSM Session Manager (ADR-011, no inbound ports):
+Relationship to this design: the lab is the **evidence environment, not part of the af-south-1 target deployment** (ADR-013). AWS reaches it through a single ops host in the private application subnets, administered via SSM Session Manager (ADR-011, no inbound ports):
 
 | Host | Purpose | Owner |
 |---|---|---|
-| **Tailscale connector** | EC2 running `tailscaled` as a subnet router; the only bridge between the VPC and the tailnet. Keycloak reaches the lab clinic directory through it (F10–F13 in the capstone); production returns to NAT + allowlist | Cloud (MEMBER 1) |
-| **Log-forwarder** | EC2 running the Wazuh agent + Tailscale client; ships the API's structured access events to the Wazuh manager over the tailnet (F15, ≤30 s, V18). Log fields sanitized per ADR-012 / I-019 | **Ismail** |
+| **Ops host** (`t3.small`) | One EC2 running both daemons: `tailscaled` as a subnet router (the only bridge between the VPC and the tailnet, so Keycloak reaches the lab clinic directory via F10–F13) and the Wazuh agent (ships the API's structured access events to the Wazuh manager over the tailnet, F15, ≤30 s, V18, fields sanitized per ADR-012 / I-019). Co-located because the forwarder depends on the tailnet the connector provides; production returns to NAT + allowlist | Cloud (MEMBER 1) + Ismail (Wazuh) |
 
-Neither host carries patient data in the capstone (synthetic data only, Option C). Tailnet traffic is WireGuard-encrypted but may transit Tailscale infrastructure outside Nigeria, recorded under ADR-013 as a production-gate consideration, not a capstone blocker. A **fresh tagged tailnet auth key** is required before configuration (I-023 - the exposed key is being rotated by the Tailscale admin).
+The host carries no patient data in the capstone (synthetic data only, Option C). Tailnet traffic is WireGuard-encrypted but may transit Tailscale infrastructure outside Nigeria, recorded under ADR-013 as a production-gate consideration, not a capstone blocker. A **fresh tagged tailnet auth key** is required before configuration (I-023 - the exposed key is being rotated by the Tailscale admin).
 
 ## 5. Network security approach
 
@@ -238,7 +239,7 @@ The following items require confirmation before the design is treated as approve
 5. The exact AWS services that require VPC endpoints. *(draft inventory in §4.7)*
 6. The final subnet sizes after reviewing workload requirements. *(recommendation in ip-addressing-plan.md §6)*
 7. Whether the shared NAT gateway is acceptable for the platform's required availability. *(trade-off recorded, ADR-010)*
-8. Confirmation of the Tailscale overlay posture (hybrid, ADR-013), the ops-tier connector and log-forwarder hosts, and issuance of a fresh tagged tailnet key. *(issues I-020/I-021/I-023)*
+8. Confirmation of the Tailscale overlay posture (hybrid, ADR-013), the single ops host (Tailscale connector + Wazuh agent), and issuance of a fresh tagged tailnet key. *(issues I-020/I-021/I-023)*
 
 ## 8. Status
 

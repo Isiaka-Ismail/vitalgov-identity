@@ -173,7 +173,7 @@ Security/DevOps confirmation at review (issue I-010).*
 
 | Flow | Source | Destination | Intended access |
 |---|---|---|---|
-| F15 | VitalGov API / gateway, structured access events | Wazuh manager (lab VM on the tailnet) via the ops-tier **log-forwarder EC2** | API ships events to CloudWatch Logs (F7 interface endpoint) → log-forwarder (Wazuh agent + Tailscale client, owner: **Ismail**) → manager on TCP 1514/1515 over the tailnet |
+| F15 | VitalGov API / gateway, structured access events | Wazuh manager (lab VM on the tailnet) via the **ops host** | API ships events to CloudWatch Logs (F7 interface endpoint) → ops host (Wazuh agent + Tailscale subnet router, owner: **Ismail**) → manager on TCP 1514/1515 over the tailnet |
 
 Posture:
 
@@ -269,7 +269,8 @@ undermines the federation allowlist posture (V16).
 | `sg-ops` | Outbound | Admin/CA ports | `sg-keycloak`, `sg-ca` | - | Pipeline-driven realm and certificate operations |
 | `sg-ops` | Outbound | TCP 1514/1515 | Wazuh manager via tailnet connector | F15 | Structured access events to the SIEM, sanitized per ADR-012 |
 | `sg-endpoints` | Inbound | TCP 443 | `sg-gateway`, `sg-keycloak`, `sg-api`, `sg-ca`, `sg-ops` | F7 | Interface endpoints serve exactly these tiers |
-| `sg-nat` | Inbound | Ephemeral return | Private-subnet sources (stateful) | F10–F14 | NAT ENI; no inbound internet exposure |
+
+Note on the shared NAT gateway: it is not a security-group tier (AWS does not attach a security group to a NAT gateway ENI, and Terraform creates no `nat` SG). Return traffic for F10–F14 egress is allowed by the stateful nature of the NAT ENI; there is no inbound internet exposure, so it is governed by the outbound rules of the calling tiers rather than by an inbound matrix row.
 
 **Rules that must not exist**, each is a review finding if it appears in Terraform:
 

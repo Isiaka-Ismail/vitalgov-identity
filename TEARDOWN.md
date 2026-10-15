@@ -33,7 +33,7 @@
   `aws ssm get-parameters-by-path --path /vitalgov --recursive`
 - **CloudWatch log groups**, `/ecs/vitalgov/*`, `/aws/vpc/flowlogs/*`,
   `/aws/rds/instance/*` are partly state-tracked; verify none remain.
-- **KMS keys**, CA CMK and trail CMK have 7–14 day deletion windows;
+- **KMS keys**, CA CMK and trail CMK have 7-14 day deletion windows;
   schedule deletion then confirm.
 - **Budget + SNS**, deleted via Terraform, but AWS budgets can linger a few
   hours; confirm in Cost Explorer.
@@ -44,7 +44,7 @@
 2. If step 1 stalls on the state bucket: comment the lifecycle block,
    `terraform apply`, re-run destroy.
 3. Empty + delete remaining buckets (log versions, ECR images).
-4. Confirm zero spend: Cost Explorer → last 1 day, filter `vitalgov-*` tags.
+4. Confirm zero spend: Cost Explorer, last 1 day, filter `vitalgov-*` tags.
 5. Record the results in the table above.
 
 ## Data-retention note

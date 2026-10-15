@@ -20,7 +20,7 @@ terraform/               root config (wiring, variables, outputs)
   SecretsManager/        db-host/name/user/password, jwt, keycloak-admin
   S3/                    realm-backups bucket (Keycloak exports)
   Observability/         CloudTrail (CMK), 5 alarms, SNS, budget
-  Ops/                   Tailscale connector + Wazuh log-forwarder hosts
+  Ops/                   single ops host: Tailscale connector + Wazuh agent
   Pki/                   CA CMK; placeholder host gated by create_ca_host
   Acm/                   dormant until a domain exists
 ```
@@ -87,9 +87,9 @@ af-south-1 on-demand, always-on shape (~730 h/month, no Reserved/Spot):
 | ECS Fargate | 2 services × 0.25 vCPU / 512 MB | ~$70 |
 | RDS PostgreSQL | db.t3.micro, 20 GB gp3, Single-AZ | ~$16 |
 | VPC endpoints | 4 interface × 1 AZ + S3 gateway (free) | ~$30 |
-| EC2 ops hosts | t3.nano + t3.micro (CA host off until I-007) | ~$11 |
+| EC2 ops host | t3.small, Tailscale + Wazuh agent (CA host off until I-007) | ~$15 |
 | CloudTrail, S3, CW logs, SNS, budget | small volumes | ~$7 |
-| **Total** | | **~$190** |
+| **Total** | | **~$195** |
 
 Budget alarm: $200 ceiling, alerts at 80% ($160) and 100%. Notification
 emails are not committed; set `TF_VAR_budget_alert_emails='["<address>"]'`
@@ -103,7 +103,11 @@ at apply time.
 | Keycloak task 0.5 vCPU/1 GB → 0.25/512 MB | ~$30 | Floor for 3 test realms; raise if review loads more |
 | RDS enhanced monitoring 60 s → off | ~$20 | Per-vCPU-hour charge; basic CloudWatch + alarms remain |
 | CA placeholder host off until I-007 | ~$8 | `create_ca_host = false`; CMK still created |
-| Connector t3.micro → t3.nano | ~$5 | Tailscaled is light; forwarder stays micro (Wazuh agent) |
+
+The Tailscale connector and Wazuh log-forwarder were consolidated into one `t3.small`
+host (ADR-013): co-located because the forwarder already depends on the tailnet the
+connector provides. This costs ~$4 more than the earlier two-host split but halves the
+ops configuration surface.
 
 ### Levers the review can still pull
 

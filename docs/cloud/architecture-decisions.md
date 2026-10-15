@@ -84,6 +84,8 @@ The log will be updated when the team approves the design or makes a material ch
 
 **Documented exception - CloudTrail (issue I-005):** The brief requires VPC endpoints for every AWS service the platform calls and lists CloudTrail. AWS provides no VPC endpoint for CloudTrail. Private workloads will therefore reach the in-region CloudTrail API endpoint via the shared NAT gateway; log files are delivered to S3 through the S3 gateway endpoint. Traffic remains within `af-south-1`. This is a deliberate, documented deviation and requires security-team approval before deployment.
 
+**Log-file validation (brief non-negotiable):** CloudTrail is configured with **log-file validation enabled** (`enable_log_file_validation = true` in the Observability Terraform module), so the digest files delivered alongside each log file allow post-delivery tampering to be detected. This satisfies the brief's "CloudTrail with log file validation" requirement independently of the endpoint exception above.
+
 **Follow-up:** Endpoint inventory drafted in [aws-architecture.md](aws-architecture.md) §4.7; confirm each service, endpoint type, endpoint policy, security-group rule and route-table association.
 
 **Status:** Design principle selected; endpoint inventory drafted; CloudTrail exception pending security approval.
@@ -110,11 +112,11 @@ The log will be updated when the team approves the design or makes a material ch
 
 **Reason:** The brief's tool stack is the authoritative scope statement. The original design text in this document set described a pure-EC2 application tier, which conflicts with it (issue I-002).
 
-**Trade-off / follow-up:** ECS implies task-based networking (awsvpc mode recommended so tasks get their own ENIs and security groups), plus ECR and ECS/STS interface endpoints added to the endpoint inventory. Subnet sizing in [ip-addressing-plan.md](ip-addressing-plan.md) §6 must count tasks, not instances. **Pending DevOps confirmation of launch type (Fargate vs EC2 launch type) before Terraform is written.**
+**Trade-off / follow-up:** ECS implies task-based networking (awsvpc mode recommended so tasks get their own ENIs and security groups), plus ECR and ECS/STS interface endpoints added to the endpoint inventory. Subnet sizing in [ip-addressing-plan.md](ip-addressing-plan.md) §6 must count tasks, not instances.
 
-**Launch-type recommendation (13 Oct):** **Fargate** for the app tier (Keycloak, API gateway, VitalGov API); no instance management in a nights-only timeline, and Keycloak session state lives in RDS (ADR-009) so tasks are replaceable. **EC2 remains** for the CA tier (brief-mandated, persistent) and the **ops tier** - the Tailscale connector and the Ismail-owned log-forwarder run daemons (`tailscaled`, Wazuh agent) that need a host (ADR-013).
+**Launch-type recommendation (13 Oct):** **Fargate** for the app tier (Keycloak, API gateway, VitalGov API); no instance management in a nights-only timeline, and Keycloak session state lives in RDS (ADR-009) so tasks are replaceable. **EC2 remains** for the CA tier (brief-mandated, persistent) and the **ops tier** - a single host running the `tailscaled` and Wazuh agent daemons (ADR-013).
 
-**Status:** Proposed; pending DevOps confirmation.
+**Status:** Proposed; implemented as Fargate in the Terraform (`Ecs/` module), countersign at the four-discipline review.
 
 ---
 
@@ -212,8 +214,8 @@ subject to this posture.
 | Layer | Mechanism |
 |---|---|
 | Clinic users/devices → platform | Public ALB over HTTPS + **mTLS client certificates** (VitalGov CA) + stapled OCSP, unchanged (brief's device-trust layer) |
-| Federation (Keycloak → clinic LDAP/SAML) | **Tailscale overlay in the capstone**, an ops-tier EC2 acts as Tailscale subnet router to the lab clinic directory; NAT + egress allowlist registry (F10–F14) remains the production/real-clinic mechanism |
-| Log ingestion (Wazuh) | Ops-tier **log-forwarder EC2** (Wazuh agent + Tailscale client, owned by Ismail) → Wazuh manager over the tailnet, flow F15 |
+| Federation (Keycloak → clinic LDAP/SAML) | **Tailscale overlay in the capstone**, a single ops-tier EC2 acts as Tailscale subnet router to the lab clinic directory; NAT + egress allowlist registry (F10–F14) remains the production/real-clinic mechanism |
+| Log ingestion (Wazuh) | The **same ops host** runs the Wazuh agent + Tailscale client (owned by Ismail) → Wazuh manager over the tailnet, flow F15 |
 | AWS services | VPC endpoints (ADR-006), no change |
 
 **Reason:** the other discipline's environment reaches the lab identity systems (Samba AD/LDAP,
@@ -234,35 +236,36 @@ and the tailnet layer is retired.
 coordination/DERP infrastructure outside Nigeria, acceptable under Option C (synthetic data
 only); recorded as a consideration for the production gate (I-017/I-019).
 
-**Trade-off:** the ops-tier connector is a single point of failure for capstone federation and
+**Trade-off:** the single ops host is a single point of failure for capstone federation and
 Wazuh ingestion; lab connectivity depends on the tailnet being up. Both limits are capstone-only
 by construction.
 
 **Follow-up:** Security + DevOps confirmation at review; a **fresh tagged tailnet auth key**
 required before connector configuration (I-023); production posture returns to F10–F14.
 
-**Status:** Proposed; decision at the 13 Oct review.
+**Status:** Proposed; decision at the four-discipline review (re-booked after 13 Oct, issue I-012).
 
 ---
 
 ## Decisions register before provisioning
 
-Every row must be settled before Terraform is written. Owners bring their row to the
-four-discipline review (issue I-012).
+Terraform is written and `terraform plan` is clean (160 to add, 0 to destroy). Owners
+bring their row to the four-discipline review (issue I-012); unresolved rows may be
+deferred there with an owner and date. That sign-off is the gate to `terraform apply`.
 
 | Decision | Options | Owner | Current proposal | Settle by |
 |---|---|---|---|---|
 | Residency posture | A split / B approval / C synthetic | Sponsor + Security + counsel | **C now, design toward A (ADR-012)** | Before any data loading |
 | Clinic connectivity + lab overlay | A NAT+allowlist / B Tailscale / C hybrid | Cloud + Security + DevOps | **Hybrid (ADR-013)** (ALB mTLS for clinic users; tailnet for lab federation + Wazuh) | At review |
-| Compute model | EC2 vs ECS | DevOps + Cloud | ECS for apps, EC2 for CA (ADR-008) | Before Terraform |
-| Database | RDS vs self-managed | DevOps + Cloud | RDS PostgreSQL 15, Single-AZ (ADR-009) | Before Terraform |
-| Admin access | SSM vs bastion vs SSH | Cloud + Security | Session Manager (ADR-011) | Before Terraform |
+| Compute model | EC2 vs ECS | DevOps + Cloud | ECS for apps, EC2 for CA (ADR-008) | Before apply |
+| Database | RDS vs self-managed | DevOps + Cloud | RDS PostgreSQL 15, Single-AZ (ADR-009) | Before apply |
+| Admin access | SSM vs bastion vs SSH | Cloud + Security | Session Manager (ADR-011) | Before apply |
 | NAT strategy | 1 vs 2 gateways | Cloud + Security | Single NAT, risk accepted (ADR-010) | At review |
 | CA software + staple age/fallback | Smallstep vs EJBCA | Security; **Ismail implements** (Cloud PKI) | Open, issue I-007 | Before gateway config |
 | Residency trust model | header-only vs layered | Security + DevOps | Layered (ADR-012 / I-018) | Before API/gateway work |
 | Log retention period (NHA) | value required | Security | Open, issue I-011 | At review |
 | SAML test IdP | add container vs AWS-only test | DevOps | Open, issue I-016 | At review |
-| Subnet sizing | /20 vs /24 | Cloud + team | /24 recommendation, ip-addressing-plan §6 | At review |
+| Subnet sizing | /20 vs /24 | Cloud + team | **/24 - applied in Terraform** (ip-addressing-plan §6; resized from /20, I-009) | Resolved in code; confirm at review |
 | External clinic connectivity | allowlist + egress design | Cloud + Security | Flows F10–F14 + registry allowlist drafted, issue I-010 | At review |
 
 ## Open decisions
@@ -275,7 +278,7 @@ The following items remain open:
 - Final endpoint list and endpoint placement. *(draft inventory, aws-architecture.md §4.7)*
 - ~~Final application subnet sizing.~~ → **recommendation in ip-addressing-plan.md §6** (pending approval)
 - External client connectivity requirements. *(drafted, flows F10–F14 + allowlist posture in network-traffic-flows.md §5.1; pending Security/DevOps approval - issue I-010)*
-- Compute model (ECS vs EC2) and its launch type. *(issue I-002 → ADR-008, pending DevOps)*
+- ~~Compute model (ECS vs EC2) and its launch type.~~ → **Fargate in ADR-008, implemented in `Ecs/`** (pending countersign)
 - NHA log retention period value. *(issue I-011, security team input)*
 - Formal team approval of the architecture and IP addressing plan. *(issue I-012, review slot)*
 
