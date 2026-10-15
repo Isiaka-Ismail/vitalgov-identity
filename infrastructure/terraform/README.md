@@ -96,8 +96,10 @@ af-south-1 on-demand, always-on shape (~730 h/month, no Reserved/Spot):
 | **Total** | | **~$195** |
 
 Budget alarm: $200 ceiling, alerts at 80% ($160) and 100%. Notification
-emails are not committed; set `TF_VAR_budget_alert_emails='["<address>"]'`
-at apply time.
+emails are not committed; export `TF_VAR_budget_alert_emails='["<address>"]'`
+before every plan and apply. Never put it in `terraform.tfvars`: a tfvars
+entry outranks the env var and silently wins, which left every alarm and the
+budget notifying nobody until it was removed.
 
 ### What was cut to get here (and what each cut saved)
 
