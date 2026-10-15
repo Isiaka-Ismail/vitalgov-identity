@@ -46,7 +46,7 @@ The log will be updated when the team approves the design or makes a material ch
 
 **Follow-up:** Check for overlap with existing networks and confirm application subnet sizing before implementation. *(Sizing recommendation drafted; see [ip-addressing-plan.md](ip-addressing-plan.md) §6, issue I-009.)*
 
-**Status:** Proposed; approval pending.
+**Status:** Proposed; implemented in the Terraform (`Networking/` module), countersign at the four-discipline review.
 
 ---
 
@@ -134,7 +134,7 @@ The log will be updated when the team approves the design or makes a material ch
 
 **Follow-up:** DevOps/Security confirmation at review; retention period value from security team.
 
-**Status:** Proposed; pending team confirmation.
+**Status:** Proposed; implemented as RDS PostgreSQL 15 Single-AZ in the Terraform (`Database/` module), countersign at the four-discipline review.
 
 ---
 
@@ -148,7 +148,7 @@ The log will be updated when the team approves the design or makes a material ch
 
 **Follow-up:** Revisit if the security team's OCSP fallback design or external-connectivity requirements (I-007, I-010) make egress availability a hard requirement; a second NAT is a small Terraform change if decided before provisioning. *(Update 12 Oct, Night 2: I-010 flows drafted, F10–F14 confirm federation egress is bursty and fail-closed for new logins only, so the single-NAT risk profile is unchanged; decision still required at review.)*
 
-**Status:** Proposed; decision required at team review.
+**Status:** Proposed; implemented as one NAT gateway, risk accepted pending countersign at the four-discipline review.
 
 ---
 
@@ -162,7 +162,7 @@ The log will be updated when the team approves the design or makes a material ch
 
 **Trade-off:** Adds three interface endpoints (small hourly cost); breaks if endpoints or IAM policy are misconfigured; covered by validation item 9 in [network-traffic-flows.md](network-traffic-flows.md).
 
-**Status:** Proposed; pending approval.
+**Status:** Proposed; implemented as Session Manager in the Terraform (`Ops/` module), countersign at the four-discipline review.
 
 ---
 
@@ -247,7 +247,7 @@ by construction.
 **Follow-up:** Security + DevOps confirmation at review; a **fresh tagged tailnet auth key**
 required before connector configuration (I-023); production posture returns to F10–F14.
 
-**Status:** Proposed; decision at the four-discipline review (re-booked after 13 Oct, issue I-012).
+**Status:** Proposed; implemented as the single ops host in the Terraform (`Ops/` module), decision at the four-discipline review (re-booked after 13 Oct, issue I-012).
 
 ---
 

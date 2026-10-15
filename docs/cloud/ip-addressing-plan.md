@@ -79,7 +79,7 @@ AWS reserves five IPv4 addresses in each subnet. Therefore, the usable address c
 - Reserve unused address space for future needs.
 - Data and PKI subnet route tables must not include a `0.0.0.0/0` route, those tiers are egress-blocked (see network-traffic-flows.md §5; validation V10).
 - Use clear Terraform names that identify the VPC, environment, subnet tier and AZ.
-- Record the actual subnet IDs and AZ identifiers after provisioning in the deployment inventory.
+- Applied CIDRs match this plan; subnet IDs are in the deployment inventory.
 
 ## 6. Items to confirm
 
@@ -90,7 +90,7 @@ Before implementation, confirm:
 3. Whether dedicated data and PKI subnet tiers are required by the final service placement.
 4. Whether interface endpoints will use dedicated or existing private subnets. **Resolved: placed in the application subnets in Terraform; `10.20.80.0/24` and `10.20.81.0/24` reserved (§3).**
 
-### Application subnet sizing recommendation (draft, for team review)
+### Application subnet sizing recommendation
 
 Expected addressable resources in the application tier, per AZ:
 
@@ -106,10 +106,10 @@ A `/24` provides 251 usable addresses per AZ (AWS reserves 5), which covers the 
 
 Rationale: smaller subnets are easier to justify in review, reduce accidental-attachment blast radius, and keep future on-premises/VPN overlap checks (item 1) simple. The change costs nothing if made before provisioning.
 
-*Status: recommendation proposed, pending team approval alongside ADR-003.*
+*Status: applied in Terraform 15 Oct 2026; countersign alongside ADR-003.*
 
 ## 7. Status
 
-**Status: Proposed, pending network overlap checks and team approval.**
+**Status: Implemented in Terraform and applied 15 Oct 2026 (8 subnets, all /24); countersign at the four-discipline review (issue I-012).**
 
-This plan records the intended address allocation. Actual AWS subnet IDs and deployment status will be documented after Terraform provisioning.
+This plan records the deployed address allocation. All eight subnets were created on 15 Oct 2026 and the live CIDRs match this plan.

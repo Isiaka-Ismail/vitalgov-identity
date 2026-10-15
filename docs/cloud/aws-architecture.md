@@ -152,7 +152,7 @@ VPC endpoints are used where private workloads need private AWS service access: 
 
 CloudWatch, ECR and ECS traffic traverses the shared NAT gateway; see the endpoint set decision after the inventory below.
 
-#### Endpoint inventory (draft, pending team review)
+#### Endpoint inventory
 
 Interface endpoints are placed in the private application subnet of AZ 1 (`endpoint_az_count = 1`); set `endpoint_az_count = 2` for dual-AZ placement. The reserved endpoint ranges from [ip-addressing-plan.md](ip-addressing-plan.md) §3 (`10.20.80.0/24`, `10.20.81.0/24`) are held unused should dedicated endpoint subnets be required later.
 
@@ -245,6 +245,6 @@ The following items require confirmation before the design is treated as approve
 
 ## 8. Status
 
-**Status: Proposed, pending team review.**
+**Status: Implemented in Terraform and applied 15 Oct 2026; countersign at the four-discipline review (issue I-012).**
 
-This document describes the intended architecture. Implementation, connectivity validation and security testing will be recorded separately after provisioning.
+This document describes the deployed architecture. The stack was applied on 15 Oct 2026 (166 resources). Connectivity validation and security testing are still outstanding and are tracked as the validation items in [network-traffic-flows.md](network-traffic-flows.md).

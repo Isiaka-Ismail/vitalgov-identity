@@ -166,7 +166,7 @@ Design posture, each point is separately reviewable:
 - **Known limitation:** per-domain egress enforcement (DNS filtering or an egress proxy) would
   require additional infrastructure; it is documented as future hardening, not capstone scope.
 
-*Status: flows proposed; allowlist posture and registry owner (Cloud vs DevOps) require
+*Status: flows implemented in Terraform; allowlist posture and registry owner (Cloud vs DevOps) require
 Security/DevOps confirmation at review (issue I-010).*
 
 ### Log shipping to Wazuh (F15, drafted 13 Oct, closes I-024)
@@ -233,7 +233,7 @@ Full configuration detail: aws-architecture.md §5, *Administrative access detai
 
 Avoid unrestricted inbound rules for SSH, database ports and CA administration. Security groups should describe actual service dependencies rather than allowing broad communication between every subnet.
 
-### Security-group matrix (draft, 12 Oct Night 2, for team review)
+### Security-group matrix
 
 One security group per tier; cross-tier access references security-group IDs, not subnet CIDRs.
 ECS tasks (ADR-008, `awsvpc` mode) attach the tier's security group, so membership follows the
@@ -327,6 +327,6 @@ The presence of a documented flow does not prove the corresponding rule exists. 
 
 ## 10. Status
 
-**Status: Proposed, pending team review and implementation validation.**
+**Status: Rules implemented in Terraform and applied 15 Oct 2026; countersign at the four-discipline review (issue I-012).**
 
-The presence of a documented traffic flow does not prove that the corresponding AWS rule has been configured or tested. Validation evidence should be recorded after provisioning.
+The rules behind these flows were applied on 15 Oct 2026. A documented flow is not evidence that it was tested, so the validation evidence in the table above still has to be collected.
