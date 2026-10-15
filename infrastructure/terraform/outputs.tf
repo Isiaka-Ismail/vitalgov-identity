@@ -9,7 +9,7 @@ output "public_subnet_ids" {
 }
 
 output "app_subnet_ids" {
-  description = "Private application subnet IDs (ECS, ops hosts)."
+  description = "Private application subnet IDs (ECS, ops host)."
   value       = module.networking.app_subnet_ids
 }
 

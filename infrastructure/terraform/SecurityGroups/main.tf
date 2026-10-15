@@ -17,9 +17,7 @@ locals {
   )
 }
 
-# ---------------------------------------------------------------------------
-# SGs
-# ---------------------------------------------------------------------------
+# Security groups
 
 resource "aws_security_group" "alb" {
   name        = "${var.project_name}-${var.environment}-alb-sg"
@@ -113,9 +111,7 @@ resource "aws_security_group" "endpoints" {
   })
 }
 
-# ---------------------------------------------------------------------------
 # F1/F2 - ALB ingress and forwarding
-# ---------------------------------------------------------------------------
 
 resource "aws_security_group_rule" "alb_ingress_https" {
   description       = "F1: clinic user HTTPS - the only internet-facing listener in the design"
@@ -169,10 +165,8 @@ resource "aws_security_group_rule" "alb_dns_tcp" {
   cidr_blocks       = [var.vpc_cidr]
 }
 
-# ---------------------------------------------------------------------------
 # Gateway tier (rules exist now so the matrix is complete; the service itself
 # deploys after the APISIX/Kong decision)
-# ---------------------------------------------------------------------------
 
 resource "aws_security_group_rule" "gateway_ingress_target" {
   description              = "F2: client traffic exclusively through the ALB"
@@ -244,9 +238,7 @@ resource "aws_security_group_rule" "gateway_dns_tcp" {
   cidr_blocks       = [var.vpc_cidr]
 }
 
-# ---------------------------------------------------------------------------
 # Keycloak tier (F5, F6, F10–F12)
-# ---------------------------------------------------------------------------
 
 resource "aws_security_group_rule" "keycloak_ingress_from_api" {
   description              = "F5: token issuance/validation endpoints for the API"
@@ -342,9 +334,7 @@ resource "aws_security_group_rule" "keycloak_dns_tcp" {
   cidr_blocks       = [var.vpc_cidr]
 }
 
-# ---------------------------------------------------------------------------
 # API tier (F3, F5, F6)
-# ---------------------------------------------------------------------------
 
 resource "aws_security_group_rule" "api_ingress_from_alb" {
   description              = "F3 (wave 1 shape): direct ALB to API. Gateway replaces this when deployed."
@@ -429,9 +419,7 @@ resource "aws_security_group_rule" "api_egress_https_registry" {
   cidr_blocks       = ["0.0.0.0/0"]
 }
 
-# ---------------------------------------------------------------------------
 # RDS tier (F6, ADR-009)
-# ---------------------------------------------------------------------------
 
 resource "aws_security_group_rule" "rds_ingress_from_api" {
   description              = "F6: PostgreSQL from the API tier only"
@@ -453,9 +441,7 @@ resource "aws_security_group_rule" "rds_ingress_from_keycloak" {
   source_security_group_id = aws_security_group.keycloak.id
 }
 
-# ---------------------------------------------------------------------------
 # CA tier (F4, ADR-011)
-# ---------------------------------------------------------------------------
 
 resource "aws_security_group_rule" "ca_ingress_from_gateway" {
   description              = "F4: staple refresh + approved ops only"
@@ -497,9 +483,7 @@ resource "aws_security_group_rule" "ca_dns_tcp" {
   cidr_blocks       = [var.vpc_cidr]
 }
 
-# ---------------------------------------------------------------------------
 # Ops tier (F13–F15, ADR-013)
-# ---------------------------------------------------------------------------
 
 # F13/F14: onboarding-pipeline federation pre-checks via NAT.
 resource "aws_security_group_rule" "ops_egress_https_registry" {
@@ -585,9 +569,7 @@ resource "aws_security_group_rule" "ops_dns_tcp" {
   cidr_blocks       = [var.vpc_cidr]
 }
 
-# ---------------------------------------------------------------------------
 # Endpoints tier (F7)
-# ---------------------------------------------------------------------------
 
 resource "aws_security_group_rule" "endpoints_ingress_from_api" {
   description              = "F7: interface endpoints serve the API tier"

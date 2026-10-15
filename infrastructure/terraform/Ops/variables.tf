@@ -10,7 +10,7 @@ variable "environment" {
 }
 
 variable "aws_region" {
-  description = "AWS region where the ops hosts run."
+  description = "AWS region where the ops host runs."
   type        = string
 }
 
@@ -21,12 +21,12 @@ variable "common_tags" {
 }
 
 variable "app_subnet_ids" {
-  description = "Private application subnet IDs for the ops hosts."
+  description = "Private application subnet IDs for the ops host."
   type        = list(string)
 }
 
 variable "ops_security_group_id" {
-  description = "Security group for the ops hosts (owned by the SecurityGroups module)."
+  description = "Security group for the ops host (owned by the SecurityGroups module)."
   type        = string
 }
 

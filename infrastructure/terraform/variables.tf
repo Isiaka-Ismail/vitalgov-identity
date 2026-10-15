@@ -39,7 +39,7 @@ variable "availability_zones" {
 }
 
 # Tier CIDRs follow ip-addressing-plan.md. Application subnets are right-sized
-# to /24 (§6 resize recommendation, open decision #3).
+# to /24 (§6 resize, I-009 resolved and applied in Terraform).
 variable "public_subnet_cidrs" {
   description = "Public subnet CIDRs (ALB + NAT placement)."
   type        = list(string)
@@ -47,7 +47,7 @@ variable "public_subnet_cidrs" {
 }
 
 variable "app_subnet_cidrs" {
-  description = "Private application subnet CIDRs (ECS, Keycloak, ops hosts)."
+  description = "Private application subnet CIDRs (ECS, Keycloak, ops host)."
   type        = list(string)
   default     = ["10.20.16.0/24", "10.20.32.0/24"]
 }

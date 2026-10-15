@@ -34,10 +34,8 @@ resource "aws_internet_gateway" "vitalgov" {
   )
 }
 
-# ---------------------------------------------------------------------------
 # Subnets - explicit CIDRs from ip-addressing-plan.md §3, not cidrsubnet.
 # Tiers: public (ALB+NAT) / app (ECS, ops) / data (RDS) / pki (CA host).
-# ---------------------------------------------------------------------------
 
 resource "aws_subnet" "public" {
   count = length(var.availability_zones)
@@ -106,10 +104,8 @@ resource "aws_subnet" "pki" {
   )
 }
 
-# ---------------------------------------------------------------------------
 # NAT gateway - single instance in AZ 1 (ADR-010 cost trade-off; review may
 # require a second NAT for AZ-resilient egress).
-# ---------------------------------------------------------------------------
 
 resource "aws_eip" "nat" {
   domain = "vpc"
@@ -136,10 +132,8 @@ resource "aws_nat_gateway" "main" {
   depends_on = [aws_internet_gateway.vitalgov]
 }
 
-# ---------------------------------------------------------------------------
 # Route tables - public → IGW, app → NAT, data & pki → local only.
 # The data/PKI route tables deliberately have NO 0.0.0.0/0 route.
-# ---------------------------------------------------------------------------
 
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.vitalgov.id
@@ -235,9 +229,7 @@ resource "aws_route_table_association" "pki" {
   route_table_id = aws_route_table.pki.id
 }
 
-# ---------------------------------------------------------------------------
 # VPC flow logs → CloudWatch Logs (brief monitoring requirement).
-# ---------------------------------------------------------------------------
 
 resource "aws_flow_log" "vpc" {
   vpc_id               = aws_vpc.vitalgov.id
