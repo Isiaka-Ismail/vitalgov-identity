@@ -57,8 +57,7 @@ variable "services" {
     memory            = number
     desired_count     = number
     health_check_path = string
-    # Custom container health check (CMD-SHELL string). Null uses wget against
-    # health_check_path: images without wget must supply this.
+    # Null uses wget against health_check_path; images without wget must supply this.
     health_check_cmd       = optional(string)
     security_group_id      = string
     attach_to_target_group = bool

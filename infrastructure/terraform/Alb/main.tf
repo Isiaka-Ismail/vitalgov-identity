@@ -10,8 +10,7 @@ locals {
   )
 }
 
-# The ALB security group is owned by the SecurityGroups module; this module
-# only consumes it.
+# The ALB security group lives in the SecurityGroups module; this module only consumes it.
 
 resource "aws_lb" "application" {
   name                       = "${var.project_name}-${var.environment}-alb"

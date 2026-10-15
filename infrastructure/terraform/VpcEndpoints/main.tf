@@ -1,7 +1,4 @@
-# S3 gateway + KMS, Secrets Manager, SSM/SSMMessages interface endpoints in
-# AZ 1 (endpoint_az_count = 2 restores dual-AZ); every other AWS service
-# egresses via NAT. Inventory and the documented deviation:
-# docs/cloud/aws-architecture.md §4.7 (ADR-006, I-005, I-028).
+# Inventory + documented deviation: docs/cloud/aws-architecture.md §4.7 (ADR-006, I-005, I-028).
 
 locals {
   common_tags = merge(

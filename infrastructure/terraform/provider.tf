@@ -1,5 +1,4 @@
-# All resources live in af-south-1 (brief requirement, residency ADR-012).
-# No second regional provider: no Amplify/CloudFront, no cross-region cert work.
+# All resources in af-south-1 (brief requirement, residency ADR-012); no cross-region work.
 
 provider "aws" {
   region  = var.aws_region

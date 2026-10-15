@@ -1,6 +1,4 @@
-# Ops tier (ADR-013): single ops host in the private app subnets running the
-# Tailscale connector and the Wazuh agent. No public IP, SSM only (ADR-011);
-# auth key in an SSM SecureString, never user data (I-023 pending).
+# Ops tier (ADR-013): one host (Tailscale connector + Wazuh agent), no public IP, SSM only; key in SSM, I-023 pending.
 
 locals {
   common_tags = merge(
@@ -40,8 +38,7 @@ resource "aws_iam_role_policy_attachment" "ops_ssm" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-# F15: the Wazuh agent reads API structured events from CloudWatch Logs
-# (egress via the shared NAT gateway, endpoint set reduced per ADR-006).
+# F15: agent reads API events from CloudWatch Logs (egress via shared NAT, per ADR-006).
 resource "aws_iam_role_policy" "ops_logs_read" {
   name = "${var.project_name}-${var.environment}-ops-logs-read"
   role = aws_iam_role.ops_host.id
@@ -116,9 +113,7 @@ resource "aws_instance" "ops" {
     #!/bin/bash
     set -euo pipefail
     systemctl enable --now amazon-ssm-agent
-    # Tailscale and the Wazuh agent are installed by the ops pipeline via
-    # SSM once a fresh tagged auth key is issued (I-023) and the manager
-    # address + tailnet route are known.
+    # Installed by the ops pipeline via SSM once the rotated key (I-023) and manager address are in place.
     echo "${var.project_name}-ops bootstrapped $(date -u +%FT%TZ)" > /var/log/${var.project_name}-bootstrap.log
   EOT
 

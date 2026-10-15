@@ -1,5 +1,4 @@
-# Remote state bucket + lock table. Bootstrap: init -backend=false,
-# apply -target=module.state, init -migrate-state.
+# Bootstrap: init -backend=false, apply -target=module.state, init -migrate-state.
 
 resource "aws_s3_bucket" "tfstate" {
   bucket = "${var.project_name}-${var.environment}-tfstate"

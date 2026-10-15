@@ -34,8 +34,7 @@ resource "aws_internet_gateway" "vitalgov" {
   )
 }
 
-# Subnets - explicit CIDRs from ip-addressing-plan.md §3, not cidrsubnet.
-# Tiers: public (ALB+NAT) / app (ECS, ops) / data (RDS) / pki (CA host).
+# Explicit CIDRs from ip-addressing-plan.md §3 (not cidrsubnet): public/app/data/pki tiers.
 
 resource "aws_subnet" "public" {
   count = length(var.availability_zones)
@@ -86,8 +85,7 @@ resource "aws_subnet" "data" {
   )
 }
 
-# Restricted CA tier (ADR-007). No NAT route: the CA host reaches AWS APIs
-# only through interface endpoints (KMS); admin access is SSM-only (ADR-011).
+# Restricted CA tier (ADR-007): no NAT route (KMS endpoint only), SSM-only admin (ADR-011).
 resource "aws_subnet" "pki" {
   count = length(var.availability_zones)
 
@@ -104,8 +102,7 @@ resource "aws_subnet" "pki" {
   )
 }
 
-# NAT gateway - single instance in AZ 1 (ADR-010 cost trade-off; review may
-# require a second NAT for AZ-resilient egress).
+# Single NAT in AZ 1 (ADR-010 cost trade-off; review may require a second for AZ-resilient egress).
 
 resource "aws_eip" "nat" {
   domain = "vpc"
@@ -132,8 +129,7 @@ resource "aws_nat_gateway" "main" {
   depends_on = [aws_internet_gateway.vitalgov]
 }
 
-# Route tables - public → IGW, app → NAT, data & pki → local only.
-# The data/PKI route tables deliberately have NO 0.0.0.0/0 route.
+# public → IGW, app → NAT, data & pki → local only (deliberately no 0.0.0.0/0 route).
 
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.vitalgov.id

@@ -16,8 +16,7 @@ resource "aws_iam_openid_connect_provider" "github" {
   }
 }
 
-# One repo: vitalgov-identity is a monorepo (app + infra), so no second
-# repo trust binding is needed.
+# One repo (vitalgov-identity is a monorepo), so no second trust binding.
 resource "aws_iam_role" "github_actions" {
   name = "${var.project_name}-${var.environment}-github-actions"
 

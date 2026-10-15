@@ -1,6 +1,4 @@
-# Bucket for Keycloak realm exports (brief: daily S3 backups) and general
-# application data. Capstone: force_destroy=true so teardown is one command;
-# flip for any environment holding real data.
+# Keycloak realm exports and app data (brief: daily S3 backups); force_destroy=true keeps teardown one command, flip for real data.
 
 resource "aws_s3_bucket" "data" {
   bucket        = "${var.project_name}-${var.environment}-${var.bucket_purpose}"

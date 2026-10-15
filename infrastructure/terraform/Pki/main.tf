@@ -1,6 +1,4 @@
-# PKI tier (ADR-007): KMS CMK for the issuing CA key, created regardless of
-# the CA software choice. The host is gated by create_ca_host until I-007
-# (owner: Ismail). No public IP, SSM only (ADR-011), no NAT route (V10).
+# PKI tier (ADR-007): CMK always created; host gated by create_ca_host until I-007 (Ismail). No public IP, no NAT (V10), SSM only.
 
 locals {
   common_tags = merge(
@@ -39,9 +37,7 @@ resource "aws_kms_key" "ca" {
           Resource  = "*"
         },
         {
-          # Passed as an input (not string-interpolated) so Terraform creates a
-          # dependency edge on module.iam; KMS rejects policies naming a role
-          # that does not exist yet.
+          # Input, not interpolated: creates the module.iam dependency edge; KMS rejects roles that do not exist yet.
           Sid       = "DeployRoleAdmin"
           Effect    = "Allow"
           Principal = { AWS = var.deploy_role_arn }
@@ -56,9 +52,7 @@ resource "aws_kms_key" "ca" {
           Resource = "*"
         }
       ],
-      # CA host may use the key but not administer it. Emitted only when the
-      # host (and its IAM role) actually exists; KMS rejects an unresolvable
-      # principal, and create_ca_host defaults to false.
+      # Emitted only when the host exists; KMS rejects unresolvable principals (create_ca_host defaults to false).
       var.create_ca_host ? [
         {
           Sid       = "CAHostUse"
@@ -166,8 +160,7 @@ resource "aws_instance" "ca_host" {
     delete_on_termination = true
   }
 
-  # Placeholder bootstrap. No package installs: the PKI subnet has no NAT
-  # route (V10); artifacts arrive via SSM or the S3 gateway endpoint.
+  # No package installs: the PKI subnet has no NAT route (V10); artifacts arrive via SSM or the S3 gateway.
   user_data = <<-EOT
     #!/bin/bash
     set -euo pipefail

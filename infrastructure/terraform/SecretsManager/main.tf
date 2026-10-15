@@ -10,8 +10,7 @@ locals {
   )
 }
 
-# AWS-managed key (default). A CMK adds per-decrypt audit and rotation
-# control but ~$1/mo per key. The only CMK here is the brief-mandated CA key.
+# AWS-managed key; a CMK adds audit/rotation at ~$1/mo, only the brief-mandated CA key uses one.
 locals {
   secrets = {
     "db-host"                 = var.db_host

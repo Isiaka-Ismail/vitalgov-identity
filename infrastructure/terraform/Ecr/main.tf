@@ -1,8 +1,7 @@
 resource "aws_ecr_repository" "api" {
   name = var.ecr_repository_name
 
-  # mutable so `latest` stays useful in a capstone environment; flip to
-  # immutable once the deploy pipeline pins tags.
+  # Mutable so `latest` stays useful in a capstone; flip to immutable once the pipeline pins tags.
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {

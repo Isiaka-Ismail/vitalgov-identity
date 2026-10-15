@@ -1,9 +1,4 @@
-# All tier security groups in one module: the full §7.2 matrix of
-# network-traffic-flows.md is reviewable in this single file, and no other
-# module creates SGs for these tiers (cycles impossible).
-#
-# Every rule is a standalone aws_security_group_rule - mixing inline and
-# standalone rules makes the provider revoke unmanaged ones.
+# One module keeps the §7.2 matrix reviewable; all rules standalone (inline mixing makes the provider revoke unmanaged ones).
 
 locals {
   common_tags = merge(
@@ -68,9 +63,7 @@ resource "aws_security_group" "rds" {
   description = "RDS PostgreSQL: ingress only from API and Keycloak."
   vpc_id      = var.vpc_id
 
-  # No egress: RDS initiates nothing outbound.
-  # No inline egress block: an empty-CIDR rule is not storable and keeps the
-  # plan permanently dirty.
+  # No egress (RDS initiates nothing); no inline egress block: an empty-CIDR rule would keep the plan dirty.
 
   tags = merge(local.common_tags, {
     Name = "${var.project_name}-${var.environment}-rds-sg"
@@ -133,8 +126,7 @@ resource "aws_security_group_rule" "alb_ingress_http_redirect" {
   cidr_blocks       = var.ingress_cidr_blocks
 }
 
-# Wave 1: ALB to API directly. When the gateway tier deploys, retarget this
-# rule to the gateway SG (F2) - one-line change, tracked in the gateway work.
+# Wave 1: ALB to API directly; retarget to the gateway SG (F2) when the gateway tier deploys.
 resource "aws_security_group_rule" "alb_egress_to_api" {
   description              = "F2 (wave 1 shape): forward to API targets only"
   type                     = "egress"
@@ -165,8 +157,7 @@ resource "aws_security_group_rule" "alb_dns_tcp" {
   cidr_blocks       = [var.vpc_cidr]
 }
 
-# Gateway tier (rules exist now so the matrix is complete; the service itself
-# deploys after the APISIX/Kong decision)
+# Gateway tier rules exist now so the matrix is complete; the service deploys after the API-gateway decision.
 
 resource "aws_security_group_rule" "gateway_ingress_target" {
   description              = "F2: client traffic exclusively through the ALB"
@@ -280,8 +271,7 @@ resource "aws_security_group_rule" "keycloak_egress_rds" {
   source_security_group_id = aws_security_group.rds.id
 }
 
-# F10/F11: clinic federation over LDAPS. Registry-scoped: the concrete clinic
-# IP allowlist is applied at deployment (open decision, §5.1).
+# F10/F11: LDAPS clinic federation, registry-scoped; the concrete IP allowlist is applied at deployment (§5.1).
 resource "aws_security_group_rule" "keycloak_egress_ldaps_clinic" {
   description       = "F10/F11: clinic federation LDAPS via NAT - registry-scoped at deployment"
   type              = "egress"
@@ -416,9 +406,7 @@ resource "aws_security_group_rule" "api_dns_tcp" {
   cidr_blocks       = [var.vpc_cidr]
 }
 
-# Container image pulls from ECR traverse the NAT gateway (awsvpc/Fargate pulls
-# egress over the task ENI). Without this the API task fails CannotPullContainerError
-# and the service circuit-breaker rolls back on the first deploy.
+# Fargate pulls egress over the task ENI; without this rule the first deploy fails CannotPullContainerError.
 resource "aws_security_group_rule" "api_egress_https_registry" {
   description       = "ECR pulls and CloudWatch Logs (awslogs) egress via NAT (endpoint set reduced per ADR-006)"
   type              = "egress"
@@ -536,9 +524,7 @@ resource "aws_security_group_rule" "ops_egress_ca_ops" {
   source_security_group_id = aws_security_group.ca.id
 }
 
-# F15: structured access events to the Wazuh manager over the tailnet.
-# 100.64.0.0/10 is the Tailscale CGNAT range; traffic exits via the NAT
-# gateway to the tailnet. Sanitized per ADR-012.
+# F15 to the Wazuh manager; 100.64.0.0/10 is the Tailscale CGNAT range, exits via NAT to the tailnet (sanitized per ADR-012).
 resource "aws_security_group_rule" "ops_egress_wazuh" {
   description       = "F15: Wazuh manager ingestion ports over the tailnet"
   type              = "egress"

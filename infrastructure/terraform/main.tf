@@ -5,8 +5,7 @@ locals {
     ManagedBy   = "Terraform"
   }
 
-  # Certificate precedence: explicit ARN > DNS-validated domain cert >
-  # self-signed imported to ACM (capstone HTTPS :443 without a domain).
+  # Precedence: provided ARN > domain cert > self-signed (capstone HTTPS without a domain).
   use_domain_cert = var.certificate_arn == null && var.domain_name != null
   use_self_signed = var.certificate_arn == null && var.domain_name == null
 
@@ -32,8 +31,6 @@ module "networking" {
   common_tags         = local.common_tags
 }
 
-# All security groups in one module so the §7.2 matrix is reviewable in a
-# single file and no two modules reference each other's SGs.
 module "security_groups" {
   source = "./SecurityGroups"
 
@@ -96,8 +93,7 @@ module "secrets_manager" {
 
   project_name = var.project_name
   environment  = var.environment
-  # db_hostname (no port) not db_endpoint (host:5432) - drivers resolve DB_HOST
-  # as a bare hostname.
+  # db_hostname (no port): drivers resolve DB_HOST as a bare hostname.
   db_host                 = module.rds.db_hostname
   db_name                 = var.db_name
   db_user                 = var.db_username
@@ -107,8 +103,7 @@ module "secrets_manager" {
   common_tags             = local.common_tags
 }
 
-# One cluster, two services: the API and Keycloak (the brief's IdP).
-# Tasks run in private app subnets with no public IP (ADR-004/ADR-010).
+# One cluster, two services (API + Keycloak); tasks run private with no public IP (ADR-004/ADR-010).
 module "ecs" {
   source = "./Ecs"
 
@@ -159,9 +154,7 @@ module "ecs" {
         AWS_REGION     = var.aws_region
         KC_DB          = "postgres"
         KC_DB_URL_HOST = module.rds.db_hostname
-        # Connect to the database RDS actually creates (var.db_name); a dedicated
-        # schema keeps Keycloak's tables out of the API's. Pointing at a literal
-        # "keycloak" database crashes Keycloak - RDS never creates it.
+        # The database RDS actually creates (var.db_name); a literal "keycloak" DB never exists and crashes Keycloak.
         KC_DB_URL_DATABASE          = var.db_name
         KC_DB_URL_SCHEMA            = "keycloak"
         KC_DB_USERNAME              = var.db_username
@@ -246,8 +239,7 @@ module "ops" {
   common_tags           = local.common_tags
 }
 
-# CA CMK is always created; the placeholder host is gated by create_ca_host
-# until the I-007 CA software decision (owner: Ismail).
+# CMK always; host gated by create_ca_host until the I-007 decision (Ismail).
 module "pki" {
   source = "./Pki"
 
@@ -291,8 +283,7 @@ module "acm" {
   common_tags  = local.common_tags
 }
 
-# Self-signed cert imported to ACM so the ALB serves HTTPS :443 before the
-# free DNS domain is validated (ADR-004). Replaced once domain_name is set.
+# Self-signed cert imported to ACM so the ALB serves HTTPS :443 until the free DNS domain is validated (ADR-004).
 resource "tls_private_key" "self_signed" {
   count = local.use_self_signed ? 1 : 0
 

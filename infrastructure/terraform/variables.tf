@@ -38,8 +38,7 @@ variable "availability_zones" {
   default     = ["af-south-1a", "af-south-1b"]
 }
 
-# Tier CIDRs follow ip-addressing-plan.md. Application subnets are right-sized
-# to /24 (§6 resize, I-009 resolved and applied in Terraform).
+# Tier CIDRs follow ip-addressing-plan.md; subnets right-sized to /24 (I-009 resolved and applied).
 variable "public_subnet_cidrs" {
   description = "Public subnet CIDRs (ALB + NAT placement)."
   type        = list(string)

@@ -71,8 +71,7 @@ resource "aws_db_instance" "vitalgov" {
   backup_window           = "02:00-03:00"
   maintenance_window      = "sun:03:00-sun:04:00"
 
-  # Enhanced monitoring is charged per vCPU-hour; CloudWatch basic metrics
-  # (plus the Observability alarms) are sufficient for the capstone.
+  # Enhanced monitoring costs per vCPU-hour; basic metrics plus the Observability alarms suffice.
   monitoring_interval = var.monitoring_interval
   monitoring_role_arn = var.monitoring_interval > 0 ? aws_iam_role.rds_monitoring[0].arn : null
 
@@ -85,8 +84,7 @@ resource "aws_db_instance" "vitalgov" {
   apply_immediately   = false
   deletion_protection = var.deletion_protection
 
-  # Capstone posture: no final snapshot so teardown stays one command.
-  # Flip before any environment that holds real data.
+  # No final snapshot keeps teardown one command; flip before any environment holding real data.
   skip_final_snapshot = true
 
   tags = merge(

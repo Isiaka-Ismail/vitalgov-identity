@@ -10,11 +10,7 @@ locals {
   )
 }
 
-# Dormant until a domain exists (count = 0 in main.tf without domain_name).
-# The zone lives on a free external DNS service (not Route 53), so validation
-# is manual: apply with -target=module.acm, create the CNAME from the
-# validation_record output at the DNS provider, wait for ISSUED, then apply
-# the rest (a pending certificate cannot attach to the ALB listener).
+# Dormant without domain_name; validation is manual (free DNS service, no Route 53) and a pending certificate cannot attach to the listener.
 resource "aws_acm_certificate" "main" {
   domain_name       = var.domain_name
   validation_method = "DNS"

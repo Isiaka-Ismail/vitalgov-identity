@@ -60,8 +60,7 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution" {
 
 locals {
   all_secret_arns = distinct(flatten([for svc in var.services : values(svc.secrets)]))
-  # Count guard must be plan-time computable. Secret ARN *values* are unknown
-  # until apply, but the secret *keys* are literal, so count off those.
+  # Count must be plan-time computable: secret ARN values are unknown until apply, the keys are literal.
   secret_count = length(flatten([for svc in var.services : keys(svc.secrets)]))
 }
 
@@ -209,8 +208,7 @@ resource "aws_ecs_task_definition" "service" {
         }
       }
 
-      # Default health check uses wget (present in alpine-based images).
-      # Images without wget (e.g. Keycloak) set health_check_cmd instead.
+      # Default health check uses wget (alpine images); images without wget set health_check_cmd.
       healthCheck = each.value.health_check_cmd != null ? {
         command = [
           "CMD-SHELL",
