@@ -253,14 +253,14 @@ variable "github_repo_id" {
 }
 
 variable "tailscale_auth_key" {
-  description = "Tailscale auth key for the ops-tier connector. Placeholder until rotation completes (I-023); Parameter Store rejects empty values."
+  description = "Tailscale auth key for the ops-tier connector. Empty until rotation completes (I-023); Parameter Store rejects empty values."
   type        = string
   default     = "pending-I-023"
   sensitive   = true
 }
 
 variable "wazuh_manager_ip" {
-  description = "Wazuh manager address (tailnet IP or hostname) the log-forwarder ships to. Placeholder until the manager is reachable (I-024); Parameter Store rejects empty values."
+  description = "Wazuh manager address (tailnet IP or hostname) the log-forwarder ships to. Empty until the manager is reachable (I-024); Parameter Store rejects empty values."
   type        = string
   default     = "unset"
 }

@@ -1,8 +1,8 @@
 # Teardown Runbook - VitalGov Capstone Environment
 
-> The Team 2 AWS environment is not yet provisioned, so this is a
-> **forward-looking runbook**. Fill in the account/date rows when the
-> environment exists and this file becomes the teardown record.
+> The Team 2 environment is live in `af-south-1` (166 resources, applied
+> 15 Oct 2026). This is the teardown procedure; fill the date row below
+> when it is executed.
 
 | | |
 |---|---|

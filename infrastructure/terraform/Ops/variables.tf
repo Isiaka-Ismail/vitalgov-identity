@@ -31,14 +31,14 @@ variable "ops_security_group_id" {
 }
 
 variable "tailscale_auth_key" {
-  description = "Tailscale auth key (SecureString parameter). Placeholder until rotation completes (I-023); Parameter Store rejects empty values."
+  description = "Tailscale auth key (SecureString parameter). Empty until rotation completes (I-023); Parameter Store rejects empty values."
   type        = string
   default     = "pending-I-023"
   sensitive   = true
 }
 
 variable "wazuh_manager_ip" {
-  description = "Wazuh manager address (tailnet IP or hostname). Placeholder until the manager is reachable (I-024); Parameter Store rejects empty values."
+  description = "Wazuh manager address (tailnet IP or hostname). Empty until the manager is reachable (I-024); Parameter Store rejects empty values."
   type        = string
   default     = "unset"
 }

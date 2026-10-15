@@ -74,6 +74,6 @@ output "ca_kms_key_arn" {
 }
 
 output "ca_host_id" {
-  description = "Placeholder CA host in the PKI tier (null until create_ca_host = true)."
+  description = "CA host in the PKI tier (null until create_ca_host = true)."
   value       = module.pki.ca_host_id
 }

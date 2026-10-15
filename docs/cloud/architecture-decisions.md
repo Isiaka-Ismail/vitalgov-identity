@@ -292,9 +292,10 @@ a read/verify role and a scoped infrastructure changer instead of widening this 
 
 ## Decisions register before provisioning
 
-Terraform is written and `terraform plan` is clean (166 to add, 0 to destroy). Owners
-bring their row to the four-discipline review (issue I-012); unresolved rows may be
-deferred there with an owner and date. That sign-off is the gate to `terraform apply`.
+The stack was applied on 15 Oct 2026 (166 resources) and `terraform plan` reports
+`No changes`. Owners bring their row to the four-discipline review (issue I-012) as the
+record of what was settled before that apply; unresolved rows may be deferred there with
+an owner and date.
 
 | Decision | Options | Owner | Current proposal | Settle by |
 |---|---|---|---|---|
