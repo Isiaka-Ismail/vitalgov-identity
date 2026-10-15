@@ -36,7 +36,7 @@ Secrets are supplied as `TF_VAR_*` environment variables; never CLI args:
 
 ```bash
 export TF_VAR_db_username="vitalgov"
-export TF_VAR_db_password="$(openssl rand -base64 24)"
+export TF_VAR_db_password="$(openssl rand -base64 24 | tr -d '/')"  # RDS rejects / @ " and space
 export TF_VAR_jwt_secret="$(openssl rand -base64 48)"
 export TF_VAR_keycloak_admin_password="$(openssl rand -base64 24)"
 export TF_VAR_container_image="<account>.dkr.ecr.af-south-1.amazonaws.com/vitalgov-api:latest"
@@ -45,15 +45,19 @@ export TF_VAR_github_repo_id="<numeric repo id>"
 
 cd infrastructure/terraform
 
-# 1. Provision the state backend only
-terraform init -backend=false
+# 1. The s3 backend cannot serve an apply before the bucket exists, so swap in a local backend first
+cp backend.tf /tmp/backend.tf.s3
+echo 'terraform { backend "local" {} }' > backend.tf
+terraform init -reconfigure
 terraform apply -target=module.state -auto-approve
+cp /tmp/backend.tf.s3 backend.tf
 
 # 2. Migrate to the remote backend
-terraform init \
+terraform init -migrate-state \
   -backend-config="bucket=vitalgov-production-tfstate" \
   -backend-config="key=vitalgov/production/terraform.tfstate" \
   -backend-config="region=af-south-1"
+# Fallback (seen 15 Oct): if step 2 says success but the bucket is empty, `aws s3 cp terraform.tfstate s3://vitalgov-production-tfstate/vitalgov/production/terraform.tfstate --sse AES256`, then rerun step 2 with -reconfigure.
 
 # 3. Apply in waves; each wave must converge before the next
 terraform apply -target=module.networking
@@ -62,8 +66,8 @@ terraform apply -target=module.vpc_endpoints
 terraform apply -target=module.logs
 terraform apply -target=module.alb
 terraform apply -target=module.ecr
-terraform apply -target=module.secrets_manager
 terraform apply -target=module.rds
+terraform apply -target=module.secrets_manager
 terraform apply -target=module.ecs
 terraform apply -target=module.observability
 terraform apply -target=module.ops

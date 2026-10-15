@@ -1,4 +1,4 @@
-# Bootstrap: init -backend=false, apply -target=module.state, init -migrate-state.
+# Bootstrap: swap this to `backend "local" {}`, init -reconfigure, apply -target=module.state, restore, init -migrate-state.
 
 resource "aws_s3_bucket" "tfstate" {
   bucket = "${var.project_name}-${var.environment}-tfstate"

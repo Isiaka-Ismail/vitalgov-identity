@@ -255,7 +255,7 @@ undermines the federation allowlist posture (V16).
 | `sg-keycloak` | Inbound | Admin port | `sg-ops` | - | Realm administration via the config-as-code pipeline |
 | `sg-keycloak` | Outbound | TCP 5432 | `sg-rds` | F6 | Keycloak's own database |
 | `sg-keycloak` | Outbound | TCP 636 (LDAPS) | `0.0.0.0/0` via NAT, registry-scoped | F10/F11 | Clinic federation - allowlist per §5.1 |
-| `sg-keycloak` | Outbound | TCP 443 | `0.0.0.0/0` via NAT, registry-scoped | F12 | State SAML IdPs |
+| `sg-keycloak` | Outbound | TCP 443 | `0.0.0.0/0` via NAT, registry-scoped | F12 | State SAML IdPs and quay.io image pulls, one rule per permission (EC2 rejects exact duplicates) |
 | `sg-keycloak` | Outbound | TCP 443 | `sg-endpoints` | F7 | KMS, Secrets Manager, SSM |
 | `sg-api` | Inbound | TCP API port | `sg-gateway` | F3 | Only the gateway calls the API |
 | `sg-api` | Outbound | TCP 5432 | `sg-rds` | F6 | Patient/identity data store |
@@ -267,10 +267,10 @@ undermines the federation allowlist posture (V16).
 | `sg-ca` | Inbound | OS admin via SSM | SSM service, **no inbound port** | ADR-011 | No SSH listener exists |
 | `sg-ca` | Outbound | TCP 443 | `sg-endpoints` | F7 | KMS for key operations |
 | `sg-ops` | Inbound | - | No inbound rules from other tiers | - | Runner/admin initiates connections; never receives them |
-| `sg-ops` | Outbound | TCP 636 / 443 | Registry-scoped via NAT | F13/F14 | Onboarding pipeline federation pre-checks |
+| `sg-ops` | Outbound | TCP 636 | Registry-scoped via NAT | F13/F14 | Onboarding pipeline federation pre-checks; the 443 half rides the row below until the §5.1 allowlist lands |
 | `sg-ops` | Outbound | Admin/CA ports | `sg-keycloak`, `sg-ca` | - | Pipeline-driven realm and certificate operations |
 | `sg-ops` | Outbound | TCP 1514/1515 | Wazuh manager via tailnet connector | F15 | Structured access events to the SIEM, sanitized per ADR-012 |
-| `sg-ops` | Outbound | TCP 443 | `0.0.0.0/0` via NAT | F15 | CloudWatch Logs read (endpoint set per ADR-006) |
+| `sg-ops` | Outbound | TCP 443 | `0.0.0.0/0` via NAT | F13/F14, F15 | CloudWatch Logs read and federation pre-checks (endpoint set per ADR-006) |
 | `sg-endpoints` | Inbound | TCP 443 | `sg-gateway`, `sg-keycloak`, `sg-api`, `sg-ca`, `sg-ops` | F7 | Interface endpoints serve exactly these tiers |
 
 Note on the shared NAT gateway: it is not a security-group tier (AWS does not attach a security group to a NAT gateway ENI, and Terraform creates no `nat` SG). Return traffic for F10–F14 egress is allowed by the stateful nature of the NAT ENI; there is no inbound internet exposure, so it is governed by the outbound rules of the calling tiers rather than by an inbound matrix row.
@@ -283,6 +283,8 @@ Note on the shared NAT gateway: it is not a security-group tier (AWS does not at
 - Any CA-port rule whose source is not `sg-gateway` (or `sg-ops` for pipeline-driven issuance).
 - A `0.0.0.0/0` route in the data or PKI subnet route tables (egress-blocked tiers; V10).
 - Inbound listeners of any kind on the NAT gateway or interface endpoints beyond TCP 443.
+- Two rules that resolve to an identical permission (same group, direction, port range, peer).
+  EC2 rejects the second with `InvalidPermission.Duplicate`; the first apply hit this twice (I-029).
 
 **Listener-model flag (feeds I-007):** the matrix assumes the ALB terminates the outer TLS
 connection (ACM certificate) and forwards to the gateway over HTTPS, and the **gateway** performs

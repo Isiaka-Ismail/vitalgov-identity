@@ -253,7 +253,7 @@ required before connector configuration (I-023); production posture returns to F
 
 ## Decisions register before provisioning
 
-Terraform is written and `terraform plan` is clean (167 to add, 0 to destroy). Owners
+Terraform is written and `terraform plan` is clean (165 to add, 0 to destroy). Owners
 bring their row to the four-discipline review (issue I-012); unresolved rows may be
 deferred there with an owner and date. That sign-off is the gate to `terraform apply`.
 
