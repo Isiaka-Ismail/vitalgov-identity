@@ -38,11 +38,11 @@ resource "aws_iam_role" "github_actions" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
 
+          # Branch-pinned: only pushes to cloud may assume the production role (no fork/feature-branch access).
           StringLike = {
             "token.actions.githubusercontent.com:sub" = [
-              "repo:${var.github_org}/${var.github_repo}:*",
-              "repo:${var.github_org}@${var.github_org_id}/${var.github_repo}@${var.github_repo_id}:*",
-              "repo:${var.github_org}@${var.github_org_id}/${var.github_repo}@${var.github_repo_id}*"
+              "repo:${var.github_org}/${var.github_repo}:ref:refs/heads/cloud",
+              "repo:${var.github_org}@${var.github_org_id}/${var.github_repo}@${var.github_repo_id}:ref:refs/heads/cloud"
             ]
           }
         }
@@ -68,7 +68,16 @@ resource "aws_iam_role_policy" "github_actions" {
     Statement = [
       {
         Effect = "Allow"
-        Action = ["ecs:*"]
+        Action = [
+          "ecs:DescribeTaskDefinition",
+          "ecs:ListTaskDefinitions",
+          "ecs:RegisterTaskDefinition",
+          "ecs:UpdateService",
+          "ecs:DescribeServices",
+          "ecs:ListServices",
+          "ecs:StartTask",
+          "ecs:StopTask"
+        ]
         Resource = [
           "arn:aws:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:cluster/${var.project_name}-*",
           "arn:aws:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:service/${var.project_name}-*/*",
@@ -76,6 +85,7 @@ resource "aws_iam_role_policy" "github_actions" {
         ]
       },
       {
+        # AWS does not resource-scope ecr:GetAuthorizationToken; it must stay on "*".
         Effect   = "Allow"
         Action   = ["ecr:GetAuthorizationToken"]
         Resource = "*"
@@ -87,45 +97,40 @@ resource "aws_iam_role_policy" "github_actions" {
         Resource = "*"
       },
       {
-        # CloudTrail admin only matches Resource "*".
+        # Read-only trail introspection; AWS does not resource-scope these. Trail writes run from the admin profile.
         Effect = "Allow"
         Action = [
-          "cloudtrail:CreateTrail",
-          "cloudtrail:DeleteTrail",
           "cloudtrail:DescribeTrails",
+          "cloudtrail:ListTrails",
           "cloudtrail:GetTrailStatus",
-          "cloudtrail:StartLogging",
-          "cloudtrail:StopLogging",
-          "cloudtrail:UpdateTrail",
-          "cloudtrail:AddTags",
-          "cloudtrail:RemoveTags",
-          "cloudtrail:ListTags",
-          "cloudtrail:ListTrails"
+          "cloudtrail:ListTags"
         ]
         Resource = "*"
       },
       {
-        # KMS administration only matches Resource "*".
+        # Get/PutKeyPolicy and key deletion are absent: both project CMK key policies grant this role Get/PutKeyPolicy directly, so the identity policy holds no account-wide key-policy power.
         Effect = "Allow"
         Action = [
           "kms:CreateKey",
           "kms:DescribeKey",
-          "kms:GetKeyPolicy",
-          "kms:PutKeyPolicy",
           "kms:TagResource",
           "kms:UntagResource",
           "kms:EnableKeyRotation",
           "kms:GetKeyRotationStatus",
-          "kms:ScheduleKeyDeletion",
-          "kms:CancelKeyDeletion",
-          "kms:CreateAlias",
-          "kms:DeleteAlias",
-          "kms:UpdateAlias",
           "kms:ListAliases",
           "kms:ListKeys",
           "kms:ListResourceTags"
         ]
         Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:CreateAlias",
+          "kms:DeleteAlias",
+          "kms:UpdateAlias"
+        ]
+        Resource = "arn:aws:kms:${var.aws_region}:${data.aws_caller_identity.current.account_id}:alias/${var.project_name}-*"
       },
       {
         Effect = "Allow"
@@ -184,8 +189,6 @@ resource "aws_iam_role_policy" "github_actions" {
       {
         Effect = "Allow"
         Action = [
-          "secretsmanager:CreateSecret",
-          "secretsmanager:DeleteSecret",
           "secretsmanager:DescribeSecret",
           "secretsmanager:GetSecretValue",
           "secretsmanager:PutSecretValue",
@@ -246,22 +249,13 @@ resource "aws_iam_role_policy" "github_actions" {
         ]
       },
       {
+        # PassRole only to the two ECS roles; iam:Create/Put/AttachRolePolicy is a straight escalation path and is gone.
         Effect = "Allow"
-        Action = [
-          "iam:CreateRole",
-          "iam:DeleteRole",
-          "iam:GetRole",
-          "iam:PassRole",
-          "iam:TagRole",
-          "iam:UntagRole",
-          "iam:UpdateAssumeRolePolicy",
-          "iam:PutRolePolicy",
-          "iam:DeleteRolePolicy",
-          "iam:GetRolePolicy",
-          "iam:AttachRolePolicy",
-          "iam:DetachRolePolicy"
+        Action = ["iam:PassRole"]
+        Resource = [
+          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-${var.environment}-ecs-task-role",
+          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-${var.environment}-ecs-execution-role"
         ]
-        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-*"
       },
       {
         Effect = "Allow"
@@ -275,56 +269,25 @@ resource "aws_iam_role_policy" "github_actions" {
         Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
       },
       {
+        # Read and tag only: no RunInstances and no VPC/subnet/SG mutation, so CI cannot build or alter network plumbing.
         Effect = "Allow"
         Action = [
-          "ec2:CreateVpc",
-          "ec2:DeleteVpc",
-          "ec2:DescribeVpcs",
-          "ec2:CreateSubnet",
-          "ec2:DeleteSubnet",
-          "ec2:DescribeSubnets",
-          "ec2:CreateInternetGateway",
-          "ec2:AttachInternetGateway",
-          "ec2:DetachInternetGateway",
-          "ec2:DeleteInternetGateway",
-          "ec2:DescribeInternetGateways",
-          "ec2:CreateNatGateway",
-          "ec2:DeleteNatGateway",
-          "ec2:DescribeNatGateways",
-          "ec2:AllocateAddress",
-          "ec2:ReleaseAddress",
-          "ec2:DescribeAddresses",
-          "ec2:CreateRouteTable",
-          "ec2:DeleteRouteTable",
-          "ec2:DescribeRouteTables",
-          "ec2:CreateRoute",
-          "ec2:DeleteRoute",
-          "ec2:AssociateRouteTable",
-          "ec2:DisassociateRouteTable",
-          "ec2:CreateSecurityGroup",
-          "ec2:DeleteSecurityGroup",
-          "ec2:DescribeSecurityGroups",
-          "ec2:AuthorizeSecurityGroupIngress",
-          "ec2:AuthorizeSecurityGroupEgress",
-          "ec2:RevokeSecurityGroupIngress",
-          "ec2:RevokeSecurityGroupEgress",
-          "ec2:CreateTags",
-          "ec2:DeleteTags",
-          "ec2:DescribeTags",
           "ec2:DescribeInstances",
-          "ec2:RunInstances",
-          "ec2:StartInstances",
-          "ec2:StopInstances",
-          "ec2:TerminateInstances",
           "ec2:DescribeInstanceStatus",
           "ec2:DescribeImages",
           "ec2:DescribeVolumes",
-          "ec2:DescribeVpcEndpoints",
-          "ec2:CreateVpcEndpoint",
-          "ec2:DeleteVpcEndpoints",
+          "ec2:DescribeVpcs",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeSecurityGroups",
           "ec2:DescribeRouteTables",
-          "ec2:ModifyVpcAttribute",
-          "ec2:DescribeAvailabilityZones"
+          "ec2:DescribeInternetGateways",
+          "ec2:DescribeNatGateways",
+          "ec2:DescribeAddresses",
+          "ec2:DescribeVpcEndpoints",
+          "ec2:DescribeAvailabilityZones",
+          "ec2:DescribeTags",
+          "ec2:CreateTags",
+          "ec2:DeleteTags"
         ]
         Resource = "*"
       },
@@ -362,12 +325,6 @@ resource "aws_iam_role_policy" "github_actions" {
         Effect = "Allow"
         Action = [
           "budgets:ViewBudget",
-          "budgets:CreateBudget",
-          "budgets:DeleteBudget",
-          "budgets:UpdateBudget",
-          "budgets:CreateBudgetAction",
-          "budgets:DeleteBudgetAction",
-          "budgets:UpdateBudgetAction",
           "budgets:DescribeBudgetActions"
         ]
         Resource = "*"
@@ -375,16 +332,8 @@ resource "aws_iam_role_policy" "github_actions" {
       {
         Effect = "Allow"
         Action = [
-          "sns:CreateTopic",
-          "sns:DeleteTopic",
-          "sns:Subscribe",
-          "sns:Unsubscribe",
-          "sns:SetTopicAttributes",
-          "sns:GetTopicAttributes",
-          "sns:ListSubscriptionsByTopic",
           "sns:Publish",
-          "sns:TagResource",
-          "sns:UntagResource"
+          "sns:ListSubscriptionsByTopic"
         ]
         Resource = "arn:aws:sns:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${var.project_name}-*"
       }
