@@ -5,7 +5,16 @@ locals {
     ManagedBy   = "Terraform"
   }
 
-  certificate_arn = var.certificate_arn != null ? var.certificate_arn : try(module.acm[0].certificate_arn, null)
+  # Certificate precedence: explicit ARN > DNS-validated domain cert >
+  # self-signed imported to ACM (capstone HTTPS :443 without a domain).
+  use_domain_cert = var.certificate_arn == null && var.domain_name != null
+  use_self_signed = var.certificate_arn == null && var.domain_name == null
+
+  certificate_arn = (
+    var.certificate_arn != null ? var.certificate_arn :
+    local.use_domain_cert ? module.acm[0].certificate_arn :
+    aws_acm_certificate.self_signed[0].arn
+  )
 }
 
 module "networking" {
@@ -71,7 +80,7 @@ module "alb" {
   vpc_id            = module.networking.vpc_id
   public_subnet_ids = module.networking.public_subnet_ids
   container_port    = var.container_port
-  enable_https      = local.certificate_arn != null
+  enable_https      = true # a certificate is always available (provided, domain, or self-signed)
   certificate_arn   = local.certificate_arn
 
   alb_security_group_id      = module.security_groups.alb_security_group_id
@@ -274,10 +283,50 @@ module "state" {
 
 module "acm" {
   source = "./Acm"
-  count  = var.domain_name != null ? 1 : 0
+  count  = local.use_domain_cert ? 1 : 0
 
   project_name = var.project_name
   environment  = var.environment
   domain_name  = var.domain_name
   common_tags  = local.common_tags
+}
+
+# Self-signed certificate imported to ACM so the ALB serves HTTPS :443 in
+# wave 1 without a domain (brief F1). Browsers warn; the test client skips
+# verification. Replaced automatically once domain_name is set to the team's
+# free DNS domain (manual CNAME validation, no Route 53).
+resource "tls_private_key" "self_signed" {
+  count = local.use_self_signed ? 1 : 0
+
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
+
+resource "tls_self_signed_cert" "self_signed" {
+  count = local.use_self_signed ? 1 : 0
+
+  private_key_pem = tls_private_key.self_signed[0].private_key_pem
+
+  subject {
+    common_name  = "${var.project_name}.local"
+    organization = var.project_name
+  }
+
+  validity_period_hours = 8760
+  allowed_uses = [
+    "key_encipherment",
+    "digital_signature",
+    "server_auth",
+  ]
+}
+
+resource "aws_acm_certificate" "self_signed" {
+  count = local.use_self_signed ? 1 : 0
+
+  private_key      = tls_private_key.self_signed[0].private_key_pem
+  certificate_body = tls_self_signed_cert.self_signed[0].cert_pem
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-${var.environment}-self-signed"
+  })
 }

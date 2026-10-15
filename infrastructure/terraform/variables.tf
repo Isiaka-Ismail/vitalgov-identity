@@ -65,7 +65,7 @@ variable "pki_subnet_cidrs" {
 }
 
 variable "domain_name" {
-  description = "Domain name for ACM certificate (optional, enable later)."
+  description = "Domain name for the ACM certificate on the team's free DNS service; validation CNAMEs are added manually at that provider (see the Acm module's validation_record output)."
   type        = string
   default     = null
 }

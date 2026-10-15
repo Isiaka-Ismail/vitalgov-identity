@@ -99,9 +99,8 @@ Expected addressable resources in the application tier, per AZ:
 | Keycloak | 2 (tasks or instances) | Two-AZ deployment |
 | API gateway (mTLS/OCSP terminator) | 2 | Brief: gateway terminates mTLS |
 | VitalGov API | 2 | Two-AZ deployment |
-| Log forwarder / Wazuh agent host | 1 | Ships structured access events |
-| Operations / test-client node | 1 | Test client and pipeline runners |
-| **Estimated ENIs per AZ** | **≤ 8** | Even with 3× headroom: 24 |
+| Ops host (Tailscale + Wazuh + pipeline runners) | 1 | Consolidated ops tier (ADR-013) |
+| **Estimated ENIs per AZ** | **≤ 7** | Even with 3× headroom: 21 |
 
 A `/24` provides 251 usable addresses per AZ (AWS reserves 5), which covers the estimate with more than 30× headroom. **The application subnets were right-sized to `10.20.16.0/24` (AZ 1) and `10.20.32.0/24` (AZ 2)**; applied in Terraform (`terraform.tfvars`), with the remaining `10.20.16.0/20` to `10.20.63.255` space left unallocated for future expansion.
 

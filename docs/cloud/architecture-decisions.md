@@ -56,7 +56,9 @@ The log will be updated when the team approves the design or makes a material ch
 
 **Reason:** This separates the public entry point from the application compute layer and limits direct exposure of EC2 instances.
 
-**Follow-up:** Confirm the listener certificate, client access requirements, target ports and health checks.
+**Follow-up:** Confirm the client access requirements, target ports and health checks.
+
+**Listener certificate (15 Oct 2026):** The ALB terminates HTTPS :443 with an ACM certificate. Before the team's free DNS domain is validated, Terraform generates a self-signed certificate and imports it to ACM, so HTTPS works from the first deploy (browsers warn; the test client skips verification). When `domain_name` is set to the free DNS domain, the ACM DNS-validated certificate replaces it automatically; the validation CNAME is added manually at the DNS provider because the zone is not in Route 53.
 
 **Status:** Selected for the current design.
 
@@ -88,7 +90,9 @@ The log will be updated when the team approves the design or makes a material ch
 
 **Follow-up:** Endpoint inventory drafted in [aws-architecture.md](aws-architecture.md) §4.7; confirm each service, endpoint type, endpoint policy, security-group rule and route-table association.
 
-**Status:** Design principle selected; endpoint inventory drafted; CloudTrail exception pending security approval.
+**Endpoint set decision (15 Oct 2026, issue I-027):** The implemented inventory is the S3 gateway endpoint plus KMS, Secrets Manager and SSM/SSMMessages interface endpoints, placed in AZ 1 (`endpoint_az_count = 2` restores dual-AZ placement). CloudWatch, ECR and ECS traverse the shared NAT gateway instead of interface endpoints, saving about $45/month and keeping the environment under the $200 budget alarm. EC2Messages is omitted because AL2023 uses SSMMessages. This is a deliberate deviation from the brief's "VPC endpoints for every AWS service" line and requires security-team approval at the four-discipline review.
+
+**Status:** Implemented per the endpoint set decision above; CloudTrail and endpoint-set exceptions pending security approval.
 
 ---
 
@@ -249,7 +253,7 @@ required before connector configuration (I-023); production posture returns to F
 
 ## Decisions register before provisioning
 
-Terraform is written and `terraform plan` is clean (160 to add, 0 to destroy). Owners
+Terraform is written and `terraform plan` is clean (167 to add, 0 to destroy). Owners
 bring their row to the four-discipline review (issue I-012); unresolved rows may be
 deferred there with an owner and date. That sign-off is the gate to `terraform apply`.
 

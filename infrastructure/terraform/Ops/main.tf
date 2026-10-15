@@ -1,7 +1,8 @@
-# Ops tier (ADR-013): Tailscale connector + Wazuh log-forwarder in the
-# private app subnets. No public IPs, no key pair; SSM Session Manager only
-# (ADR-011). The Tailscale auth key lives in an SSM SecureString, never in
-# user data (I-023 rotation required before first `tailscale up`).
+# Ops tier (ADR-013): single ops host running the Tailscale connector and
+# the Wazuh agent in the private app subnets. No public IPs, no key pair;
+# SSM Session Manager only (ADR-011). The Tailscale auth key lives in an SSM
+# SecureString, never in user data (I-023 rotation required before first
+# `tailscale up`).
 
 locals {
   common_tags = merge(
@@ -13,27 +14,13 @@ locals {
       Layer       = "Ops"
     }
   )
-
-  hosts = {
-    "ops" = {
-      role          = "Tailscale connector + Wazuh log-forwarder (ADR-013 / F15)"
-      instance_type = "t3.small" # Wazuh agent ~1 GiB + Tailscale + log-buffer headroom
-      user_data     = <<-EOT
-        #!/bin/bash
-        set -euo pipefail
-        systemctl enable --now amazon-ssm-agent
-        # Tailscale and the Wazuh agent are installed by the ops pipeline via
-        # SSM once a fresh tagged auth key is issued (I-023) and the manager
-        # address + tailnet route are known.
-        echo "${var.project_name}-ops bootstrapped $(date -u +%FT%TZ)" > /var/log/${var.project_name}-bootstrap.log
-      EOT
-    }
-  }
 }
 
 data "aws_ssm_parameter" "al2023" {
   name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
 }
+
+data "aws_caller_identity" "current" {}
 
 resource "aws_iam_role" "ops_host" {
   name = "${var.project_name}-${var.environment}-ops-host"
@@ -53,6 +40,35 @@ resource "aws_iam_role" "ops_host" {
 resource "aws_iam_role_policy_attachment" "ops_ssm" {
   role       = aws_iam_role.ops_host.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# F15: the Wazuh agent reads API structured events from CloudWatch Logs
+# (egress via the shared NAT gateway, endpoint set reduced per ADR-006).
+resource "aws_iam_role_policy" "ops_logs_read" {
+  name = "${var.project_name}-${var.environment}-ops-logs-read"
+  role = aws_iam_role.ops_host.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "DiscoverLogGroups"
+        Effect   = "Allow"
+        Action   = ["logs:DescribeLogGroups"]
+        Resource = "*"
+      },
+      {
+        Sid    = "ReadServiceLogs"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogStreams",
+          "logs:FilterLogEvents",
+          "logs:GetLogEvents",
+        ]
+        Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/ecs/${var.project_name}/${var.environment}/*"
+      },
+    ]
+  })
 }
 
 resource "aws_iam_instance_profile" "ops_host" {
@@ -79,10 +95,8 @@ resource "aws_ssm_parameter" "wazuh_manager_ip" {
 }
 
 resource "aws_instance" "ops" {
-  for_each = local.hosts
-
   ami           = data.aws_ssm_parameter.al2023.value
-  instance_type = each.value.instance_type
+  instance_type = "t3.small" # Wazuh agent ~1 GiB + Tailscale + log-buffer headroom
   subnet_id     = var.app_subnet_ids[0]
 
   vpc_security_group_ids = [var.ops_security_group_id]
@@ -100,13 +114,21 @@ resource "aws_instance" "ops" {
     delete_on_termination = true
   }
 
-  user_data = each.value.user_data
+  user_data = <<-EOT
+    #!/bin/bash
+    set -euo pipefail
+    systemctl enable --now amazon-ssm-agent
+    # Tailscale and the Wazuh agent are installed by the ops pipeline via
+    # SSM once a fresh tagged auth key is issued (I-023) and the manager
+    # address + tailnet route are known.
+    echo "${var.project_name}-ops bootstrapped $(date -u +%FT%TZ)" > /var/log/${var.project_name}-bootstrap.log
+  EOT
 
   tags = merge(
     local.common_tags,
     {
-      Name = "${var.project_name}-${var.environment}-${each.key}"
-      Role = each.value.role
+      Name = "${var.project_name}-${var.environment}-ops"
+      Role = "Tailscale connector + Wazuh agent (ADR-013 / F15)"
       Tier = "Ops"
     }
   )

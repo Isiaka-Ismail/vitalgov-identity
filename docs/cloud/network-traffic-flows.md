@@ -61,7 +61,7 @@ not reach the API (brief: device trust layer).*
 |---|---|---|---|
 | F7 | Private EC2 workloads | Required interface endpoints | HTTPS TCP 443 |
 | F8 | Private workloads | S3 through a gateway endpoint, if selected | HTTPS using the applicable endpoint route and authorization |
-| F9 | Authorized workloads | KMS, Secrets Manager and CloudWatch | Required service APIs through supported endpoints where configured |
+| F9 | Authorized workloads | KMS and Secrets Manager (interface endpoints); CloudWatch (shared NAT, per ADR-006) | Required service APIs through supported endpoints where configured |
 
 VPC endpoints provide private connectivity to supported AWS services. They do not replace IAM permissions, resource policies or endpoint policies.
 
@@ -71,7 +71,7 @@ Interface endpoints require appropriate security-group rules. Gateway endpoints 
 
 ```mermaid
 flowchart LR
-    wl["Private workloads"] -->|"F7, HTTPS :443"| ie["Interface endpoints<br/>KMS · Secrets Manager<br/>CloudWatch · SSM"]
+    wl["Private workloads"] -->|"F7, HTTPS :443"| ie["Interface endpoints<br/>KMS · Secrets Manager<br/>SSM"]
     wl -->|"F8, route-table entry"| s3["S3 gateway endpoint<br/>backups · ALB logs · CloudTrail logs"]
     wl -->|"F9, required service APIs"| ie
     wl -->|"exception, no CloudTrail endpoint exists (I-005)"| nat["Shared NAT - AZ 1"]
@@ -173,7 +173,7 @@ Security/DevOps confirmation at review (issue I-010).*
 
 | Flow | Source | Destination | Intended access |
 |---|---|---|---|
-| F15 | VitalGov API / gateway, structured access events | Wazuh manager (lab VM on the tailnet) via the **ops host** | API ships events to CloudWatch Logs (F7 interface endpoint) → ops host (Wazuh agent + Tailscale subnet router, owner: **Ismail**) → manager on TCP 1514/1515 over the tailnet |
+| F15 | VitalGov API / gateway, structured access events | Wazuh manager (lab VM on the tailnet) via the **ops host** | API ships events to CloudWatch Logs (egress via the shared NAT gateway, endpoint set per ADR-006) → ops host (Wazuh agent reads CloudWatch Logs; Tailscale subnet router, owner: **Ismail**) → manager on TCP 1514/1515 over the tailnet |
 
 Posture:
 
@@ -249,17 +249,19 @@ undermines the federation allowlist posture (V16).
 | `sg-gateway` | Inbound | TCP admin port | `sg-ops` | - | Gateway configuration/API administration; no public path |
 | `sg-gateway` | Outbound | TCP API port | `sg-api` | F3 | Verified request forwarding (XFCC, per scaffold `docs/architecture.md`) |
 | `sg-gateway` | Outbound | TCP CA/OCSP port | `sg-ca` | F4 | Staple refresh + approved certificate operations only |
-| `sg-gateway` | Outbound | TCP 443 | `sg-endpoints` | F7 | KMS, Secrets Manager, CloudWatch, SSM |
+| `sg-gateway` | Outbound | TCP 443 | `sg-endpoints` | F7 | KMS, Secrets Manager, SSM |
+| `sg-gateway` | Outbound | TCP 443 | `0.0.0.0/0` via NAT | - | CloudWatch Logs (awslogs) egress, endpoint set per ADR-006 |
 | `sg-keycloak` | Inbound | Identity port | `sg-api` | F5 | Token issuance/validation endpoints |
 | `sg-keycloak` | Inbound | Admin port | `sg-ops` | - | Realm administration via the config-as-code pipeline |
 | `sg-keycloak` | Outbound | TCP 5432 | `sg-rds` | F6 | Keycloak's own database |
 | `sg-keycloak` | Outbound | TCP 636 (LDAPS) | `0.0.0.0/0` via NAT, registry-scoped | F10/F11 | Clinic federation - allowlist per §5.1 |
 | `sg-keycloak` | Outbound | TCP 443 | `0.0.0.0/0` via NAT, registry-scoped | F12 | State SAML IdPs |
-| `sg-keycloak` | Outbound | TCP 443 | `sg-endpoints` | F7 | AWS services |
+| `sg-keycloak` | Outbound | TCP 443 | `sg-endpoints` | F7 | KMS, Secrets Manager, SSM |
 | `sg-api` | Inbound | TCP API port | `sg-gateway` | F3 | Only the gateway calls the API |
 | `sg-api` | Outbound | TCP 5432 | `sg-rds` | F6 | Patient/identity data store |
 | `sg-api` | Outbound | TCP identity port | `sg-keycloak` | F5 | JWT validation |
 | `sg-api` | Outbound | TCP 443 | `sg-endpoints` | F7 | AWS services |
+| `sg-api` | Outbound | TCP 443 | `0.0.0.0/0` via NAT | - | ECR image pulls and CloudWatch Logs (awslogs) egress, endpoint set per ADR-006 |
 | `sg-rds` | Inbound | TCP 5432 | `sg-api`, `sg-keycloak` | F6 | No other caller; no public accessibility (ADR-009) |
 | `sg-ca` | Inbound | TCP CA/OCSP port | `sg-gateway` | F4 | Staple refresh + approved ops only |
 | `sg-ca` | Inbound | OS admin via SSM | SSM service, **no inbound port** | ADR-011 | No SSH listener exists |
@@ -268,6 +270,7 @@ undermines the federation allowlist posture (V16).
 | `sg-ops` | Outbound | TCP 636 / 443 | Registry-scoped via NAT | F13/F14 | Onboarding pipeline federation pre-checks |
 | `sg-ops` | Outbound | Admin/CA ports | `sg-keycloak`, `sg-ca` | - | Pipeline-driven realm and certificate operations |
 | `sg-ops` | Outbound | TCP 1514/1515 | Wazuh manager via tailnet connector | F15 | Structured access events to the SIEM, sanitized per ADR-012 |
+| `sg-ops` | Outbound | TCP 443 | `0.0.0.0/0` via NAT | F15 | CloudWatch Logs read (endpoint set per ADR-006) |
 | `sg-endpoints` | Inbound | TCP 443 | `sg-gateway`, `sg-keycloak`, `sg-api`, `sg-ca`, `sg-ops` | F7 | Interface endpoints serve exactly these tiers |
 
 Note on the shared NAT gateway: it is not a security-group tier (AWS does not attach a security group to a NAT gateway ENI, and Terraform creates no `nat` SG). Return traffic for F10–F14 egress is allowed by the stateful nature of the NAT ENI; there is no inbound internet exposure, so it is governed by the outbound rules of the calling tiers rather than by an inbound matrix row.

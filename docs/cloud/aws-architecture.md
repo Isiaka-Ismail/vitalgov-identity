@@ -148,30 +148,32 @@ The existence of a second PKI subnet does not, by itself, provide CA high availa
 
 ### VPC endpoints
 
-VPC endpoints will be used for supported AWS services that private workloads need to access. Potential requirements include S3, KMS, Secrets Manager and CloudWatch.
+VPC endpoints are used where private workloads need private AWS service access: S3 (gateway), KMS, Secrets Manager and SSM/SSMMessages (interface, AZ 1). Endpoint policies, IAM permissions and security-group rules restrict access to the intended callers.
 
-The final endpoint list will be based on the actual service dependencies. Endpoint policies, IAM permissions and security-group rules will restrict access as appropriate.
+CloudWatch, ECR and ECS traffic traverses the shared NAT gateway; see the endpoint set decision after the inventory below.
 
 #### Endpoint inventory (draft, pending team review)
 
-Endpoint placement is the private application subnets, as implemented in Terraform; the reserved endpoint ranges from [ip-addressing-plan.md](ip-addressing-plan.md) §3 (`10.20.80.0/24`, `10.20.81.0/24`) are held unused should dedicated endpoint subnets be required later.
+Interface endpoints are placed in the private application subnet of AZ 1 (`endpoint_az_count = 1`); set `endpoint_az_count = 2` for dual-AZ placement. The reserved endpoint ranges from [ip-addressing-plan.md](ip-addressing-plan.md) §3 (`10.20.80.0/24`, `10.20.81.0/24`) are held unused should dedicated endpoint subnets be required later.
 
 | Service | Endpoint type | Placement | Consumed by | Purpose in VitalGov |
 |---|---|---|---|---|
 | S3 | Gateway | Route tables of private app/data subnets | Keycloak realm backups, ALB access logs, CloudTrail log delivery | Brief: S3 for realm backups; log retention per NHA |
-| KMS | Interface | Private app subnets (both AZs) | CA tier, RDS, Secrets Manager users | Customer-managed key protecting the issuing CA key |
-| Secrets Manager | Interface | Private app subnets (both AZs) | Application services | Credentials for services and pipelines |
-| CloudWatch (monitoring + logs) | Interface | Private app subnets (both AZs) | All workloads, API access-event logs | Structured log/metric shipping for Wazuh integration |
-| SSM / SSMMessages / EC2Messages | Interface | Private app subnets (both AZs) | Admin workstations → EC2/CA nodes | Administrative access per ADR-011 (no public SSH) |
-| ECR | Interface (+ S3 gateway) | Private app subnets | ECS tasks | Container images, only if compute model is ECS (ADR-008) |
-| ECS / EC2 / STS | Interface | Private app subnets | ECS control plane calls | Only if compute model is ECS (ADR-008) |
+| KMS | Interface | Private app subnet (AZ 1) | CA tier, RDS, Secrets Manager users | Customer-managed key protecting the issuing CA key |
+| Secrets Manager | Interface | Private app subnet (AZ 1) | Application services | Credentials for services and pipelines |
+| CloudWatch (monitoring + logs) | **None (shared NAT)** | Egress via shared NAT | All workloads, API access-event logs | Structured log/metric shipping for Wazuh integration |
+| SSM / SSMMessages | Interface | Private app subnet (AZ 1) | Admin workstations → EC2/CA nodes | Administrative access per ADR-011 (no public SSH); EC2Messages omitted (AL2023) |
+| ECR | **None (shared NAT)** | Egress via shared NAT (task ENI) | ECS tasks | Container images (ADR-008) |
+| ECS / STS | **None (shared NAT)** | Egress via shared NAT | ECS control plane calls | Fargate platform calls (ADR-008) |
 | CloudTrail | **None available** | Egress via shared NAT, in-region endpoint | API calls to CloudTrail | **Documented exception**, see below |
 
 **CloudTrail endpoint exception (issue I-005):** AWS provides no VPC endpoint for CloudTrail. CloudTrail API calls from private subnets traverse the shared NAT gateway to the in-region AWS endpoint; log delivery goes to S3 via the gateway endpoint. Traffic remains within `af-south-1`. This is a formal deviation from the brief's "VPC endpoints for every AWS service" line and requires security-team approval before deployment (recorded in [architecture-decisions.md](architecture-decisions.md) ADR-006).
 
 **Log-file validation (brief non-negotiable):** CloudTrail is configured with **log file validation enabled**, so delivered log files in the S3 bucket carry digest files that allow tampering to be detected (an S3 `GetObject` against a validated digest reveals any post-delivery change). The digest files and trail logs are stored in the same af-south-1 S3 bucket and covered by the retention and encryption controls in the S3 module. Owner: Cloud Security (Ismail).
 
-This inventory is a draft for team review. Final endpoint types, policies, security-group rules and route-table associations are confirmed during implementation.
+**Endpoint set decision (15 Oct 2026, issue I-027):** The implemented inventory is the S3 gateway endpoint plus KMS, Secrets Manager and SSM/SSMMessages interface endpoints in AZ 1. CloudWatch, ECR and ECS traverse the shared NAT gateway instead of interface endpoints (about $45/month saving; cost table in the terraform README). This is a deliberate deviation from the brief's "VPC endpoints for every AWS service" line, requires security-team approval at the review, and is recorded in [architecture-decisions.md](architecture-decisions.md) ADR-006. The CloudTrail exception above remains.
+
+This inventory reflects the implemented Terraform. Changes require a plan re-run and re-review.
 
 ### NAT gateway
 

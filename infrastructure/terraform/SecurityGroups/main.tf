@@ -209,13 +209,23 @@ resource "aws_security_group_rule" "gateway_egress_ca" {
 }
 
 resource "aws_security_group_rule" "gateway_egress_endpoints" {
-  description              = "F7: KMS, Secrets Manager, CloudWatch, SSM via interface endpoints"
+  description              = "F7: KMS, Secrets Manager, SSM via interface endpoints"
   type                     = "egress"
   from_port                = 443
   to_port                  = 443
   protocol                 = "tcp"
   security_group_id        = aws_security_group.gateway.id
   source_security_group_id = aws_security_group.endpoints.id
+}
+
+resource "aws_security_group_rule" "gateway_egress_logs_nat" {
+  description       = "CloudWatch Logs egress via NAT (endpoint set reduced per ADR-006)"
+  type              = "egress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  security_group_id = aws_security_group.gateway.id
+  cidr_blocks       = ["0.0.0.0/0"]
 }
 
 resource "aws_security_group_rule" "gateway_dns_udp" {
@@ -410,7 +420,7 @@ resource "aws_security_group_rule" "api_dns_tcp" {
 # egress over the task ENI). Without this the API task fails CannotPullContainerError
 # and the service circuit-breaker rolls back on the first deploy.
 resource "aws_security_group_rule" "api_egress_https_registry" {
-  description       = "Image and asset pulls via NAT (ECR api/dkr + layer S3) - narrowed if ECR endpoints are added"
+  description       = "ECR pulls and CloudWatch Logs (awslogs) egress via NAT (endpoint set reduced per ADR-006)"
   type              = "egress"
   from_port         = 443
   to_port           = 443
@@ -540,13 +550,23 @@ resource "aws_security_group_rule" "ops_egress_wazuh" {
 }
 
 resource "aws_security_group_rule" "ops_egress_endpoints" {
-  description              = "F7: AWS services via interface endpoints (SSM, CloudWatch, S3)"
+  description              = "F7: AWS services via interface endpoints (SSM, Secrets Manager, KMS)"
   type                     = "egress"
   from_port                = 443
   to_port                  = 443
   protocol                 = "tcp"
   security_group_id        = aws_security_group.ops.id
   source_security_group_id = aws_security_group.endpoints.id
+}
+
+resource "aws_security_group_rule" "ops_egress_logs_nat" {
+  description       = "F15: CloudWatch Logs read via NAT (endpoint set reduced per ADR-006)"
+  type              = "egress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  security_group_id = aws_security_group.ops.id
+  cidr_blocks       = ["0.0.0.0/0"]
 }
 
 resource "aws_security_group_rule" "ops_dns_udp" {
